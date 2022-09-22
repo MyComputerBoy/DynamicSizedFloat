@@ -169,13 +169,18 @@ class hpf:
 			self.exp_length		= exp.GetLength()
 	
 	def Allign(self, other, additive=True):
+		print("\nhpf.Allign:")
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign)
 		_new_other = hpf(other.mant, other.exp, other.sign)
 		
 		#Calculate exponent values
-		_self_exp_val	= 2**(self.exp_length -1)- self.exp.ToInt()
-		_other_exp_val	= 2**(other.exp_length-1)-other.exp.ToInt()
+		_self_exp_val	= 2**(_new_self.exp.GetLength()-1)-_new_self.exp.ToInt()
+		_other_exp_val	= 2**(_new_other.exp.GetLength()-1)-_new_other.exp.ToInt()
+		print(_new_self.exp)
+		print(_new_other.exp)
+		print("_self_exp_val: %s" % (_self_exp_val))
+		print("_other_exp_val: %s" % (_other_exp_val))
 		
 		#Add leading one for calculations
 		if additive:
@@ -183,38 +188,45 @@ class hpf:
 			_new_other.mant.Append(True)
 		
 		#Find the largest exponent
-		_max_exp_val = (_self_exp_val) * (_self_exp_val < _other_exp_val) + (_other_exp_val) * (_self_exp_val >= _other_exp_val)
+		_max_exp_val = (_self_exp_val) * (_self_exp_val > _other_exp_val) + (_other_exp_val) * (_self_exp_val <= _other_exp_val)
 		
 		#If self represents a larger number
 		if _max_exp_val < _self_exp_val:
+			print("<")
 			#Calculate amount to shift
-			shift = (_self_exp_val - _max_exp_val)
+			shift = (_other_exp_val - _self_exp_val)
 			
 			#Shift the mantissa the appropriate amounts
-			_new_other.mant.InverseLengthAppend(shift+(_new_self.mant.GetLength()-_new_other.mant.GetLength()))
+			difference = _new_other.mant.GetLength()-_new_self.mant.GetLength()
+			if difference < 0:
+				difference = 0
+			_new_other.mant.InverseLengthAppend(difference)
 			_new_self.mant.LengthAppend(shift)
 		else:	#If other represents a larger number
+			print(">=")
 			#Calculate amount to shift
-			shift = (_other_exp_val - _max_exp_val)
+			shift = (_self_exp_val - _other_exp_val)
 			
 			#Shift the mantissa the appropriate amounts
-			_new_self.mant.InverseLengthAppend(shift+(_new_other.mant.GetLength()-_new_self.mant.GetLength()))
+			difference = _new_self.mant.GetLength()-_new_other.mant.GetLength()
+			if difference < 0:
+				difference = 0
+			_new_self.mant.InverseLengthAppend(difference)
 			_new_other.mant.LengthAppend(shift)
+		
+		print(shift)
+		print(difference)
 		
 		return _new_self, _new_other
 	
 	def __add__(self, other):
+		print("\nhpf.__add__():")
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign)
 		_new_other = hpf(other.mant, other.exp, other.sign)
 		
-		#Get exponent values
-		n_s_e_v = _new_self.exp.ToInt()
-		n_o_e_v = _new_other.exp.ToInt()
-		
 		#Check which has the largest value
-		_t_q_exp_v = n_s_e_v * (n_s_e_v > n_o_e_v) + n_o_e_v * (n_s_e_v <= n_o_e_v)
-		if n_s_e_v > n_o_e_v:
+		if _new_self.exp.ToInt() > _new_other.exp.ToInt():
 			_t_q_exp = _new_self.exp
 		else:
 			_t_q_exp = _new_other.exp
@@ -227,6 +239,9 @@ class hpf:
 		
 		#Allign mantissa
 		_new_self, _new_other = _new_self.Allign(_new_other)
+		print("Allignment:")
+		print(_new_self.mant)
+		print(_new_other.mant)
 		
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
@@ -235,12 +250,12 @@ class hpf:
 		#Add mantissa
 		_t_q_mant = _new_self.mant + _new_other.mant
 		
+		one = Binary([True])
 		#Handle carry out
 		if _t_q_mant.co:
 			_t_q_mant.Append(True)
 			_t_q_mant_len += 1
-			one = Binary([True])
-			_t_q_exp += one
+			# _t_q_exp += one
 		
 		#Find leading one
 		largest_one = -1
@@ -261,11 +276,10 @@ class hpf:
 			_t_q_exp -= shifted_b
 			
 			#resized is how many bits was popped at the bottom
-			resized = (_t_q_mant.GetLength()-shifted)-_t_q_mant_len_
+			resized = (_t_q_mant.GetLength()-shifted)-_t_q_mant_len_-1
 			i = 0
 			while _t_q_mant.data[0] != True and i < resized:
 				_t_q_mant.LengthPop(1, 0)
-				one = Binary([True])
 				_t_q_exp += one
 				
 				i += 1
@@ -283,8 +297,62 @@ class hpf:
 	def __str__(self):
 		temp_mant = Binary(self.mant.data)
 		temp_mant.Append(True)
-		v = temp_mant.ToInt()/(2**(2**(self.exp.GetLength()-1)-self.exp.ToInt()))
+		exp_v_t = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
+		print(exp_v_t)
+		exp_v = exp_v_t
+		v = exp_v*temp_mant.ToInt()/(2**(temp_mant.GetLength()-1))
 		if self.sign.data:
 			return "+%s" % (v)
 		else:
 			return "-%s" % (v)
+
+
+va = hpf()
+vb = hpf()
+
+#b = 5
+vb.mant = Binary([1,0])
+vb.exp = Binary([0,0,1,0])
+print("b:")
+print(vb)
+print(vb.__repr__())
+
+#a = 15
+va.mant = Binary([1,1,1])
+va.exp = Binary([0,0,0,0])
+print("a:")
+print(va)
+print(va.__repr__())
+
+vc = va + vb 
+
+#c
+print("c:")
+print(vc)
+print(vc.__repr__())
+
+# #a = 3
+# va.mant = Binary([0,1])
+# va.exp = Binary([1,0])
+# print("a:")
+# print(va)
+# print(va.__repr__())
+
+# vc = va + vb 
+# print("c:")
+# print(vc)
+# print(vc.__repr__())
+
+# #a = 1.1
+# va.mant = Binary([1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
+# va.exp = Binary([0,1])
+# print("a:")
+# print(va)
+# print(va.__repr__())
+
+# #c
+# print("c:")
+# vc = va + vb 
+# print(vc)
+# print(vc.__repr__())
+
