@@ -201,7 +201,7 @@ class Binary:
 			ci = m.ceil(ao/2 + at/2)
 		return Binary(q, ci)
 	
-	def Allign(self, other, Inverse=False):
+	def Allign(self, other, Inverse=False, offset=0):
 		#Clone Binary objects to new temporary variables to not mess with original objects
 		_new_self_bin = Binary(self.data)
 		_new_other_bin = Binary(other.data)
@@ -217,7 +217,8 @@ class Binary:
 			if _self_len < _max_len:
 				_new_self_bin.InverseLengthAppend(_max_len-_self_len)
 			else:
-				_new_other_bin.InverseLengthAppend(_max_len-_other_len)
+				_new_other_bin.InverseLengthAppend((_max_len-_other_len)-offset)
+				_new_other_bin.LengthAppend(offset)
 			
 			return _new_self_bin, _new_other_bin
 		
@@ -226,7 +227,8 @@ class Binary:
 				_new_self_bin.LengthAppend(_max_len-_self_len)
 		else:
 			if _max_len - _other_len >= 1:
-				_new_other_bin.LengthAppend(_max_len-_other_len)
+				_new_other_bin.LengthAppend((_max_len-_other_len)-offset)
+				_new_other_bin.InverseLengthAppend(offset)
 		
 		return _new_self_bin, _new_other_bin
 	
@@ -403,17 +405,17 @@ class hpf:
 		for i in range(_t_q_mant_len):
 			if _t_q_mant.data[i]:
 				largest_one = i
+				break
 		
-		#Pop leading one for floating point complience
+		#Pop leading one for floating point compliance
 		if largest_one == -1:
 			_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		else:
 			#Shift is how many bits was popped at the top
-			shifted = _t_q_mant_len-largest_one
-			_t_q_mant.LengthPop(shifted, -1)
+			_t_q_mant.LengthPop(largest_one+1, -1)
 			
 			shifted_b = Binary()
-			shifted_b.DoubleToBin(shifted)
+			shifted_b.DoubleToBin(largest_one+1)
 			_t_q_exp -= shifted_b
 			
 			#resized is how many bits was popped at the bottom
@@ -470,17 +472,17 @@ class hpf:
 		for i in range(_t_q_mant_len):
 			if _t_q_mant.data[i]:
 				largest_one = i
+				break
 		
-		#Pop leading one for floating point complience
+		#Pop leading one for floating point compliance
 		if largest_one == -1:
 			_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		else:
 			#Shift is how many bits was popped at the top
-			shifted = _t_q_mant_len-largest_one
-			_t_q_mant.LengthPop(shifted, -1)
+			_t_q_mant.LengthPop(largest_one+1, -1)
 			
 			shifted_b = Binary()
-			shifted_b.DoubleToBin(shifted)
+			shifted_b.DoubleToBin(largest_one+1)
 			_t_q_exp -= shifted_b
 			
 			#resized is how many bits was popped at the bottom
@@ -514,7 +516,80 @@ class hpf:
 		_t_q = self.__pure_sub__(other)
 		_t_q.sign.data[0] = not _t_q.sign.data[0]
 		return _t_q
+	
+	def __mul__(self, other, set_precision=False):
+		#Clone hpf objects to new temporary variables to not mess with original objects
+		_new_self = hpf(self.mant, self.exp, self.sign)
+		_new_other = hpf(other.mant, other.exp, other.sign)
 		
+		#Add leading one for computation
+		_new_self.mant.Append(True)
+		_new_other.mant.Append(True)
+		
+		#Make _t_q object for computation
+		_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()+1
+		_t_q = Binary([False for i in range(_t_q_mant_len)])
+		
+		#Calculate multiplication of mantissa
+		co_offset = 0
+		for i in range(len(_new_self.mant.data)-1, -1, -1):
+			if _new_self.mant.data[i]:
+				_t_q_mant, _t_other = _t_q.Allign(_new_other.mant, True, (_new_self.mant.GetLength()+co_offset)-(i+1))
+				_t_q = _t_q_mant + _t_other
+				if _t_q.co:
+					co_offset += 1
+					_t_q.Append(True)
+		
+		#Calculate exponent values
+		_new_self_exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
+		_new_other_exp_v = 2**(other.exp.GetLength()-1)-other.exp.ToInt()
+		
+		#Calculate _t_q_exp
+		_t_q_exp_v = _new_self_exp_v + _new_other_exp_v
+		_t_q_exp_v_l = 0
+		while 2**_t_q_exp_v_l <= _t_q_exp_v:
+			_t_q_exp_v_l += 1
+		_t_q_exp_v_l += 1
+		
+		_t_q_exp = Binary()
+		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-_t_q_exp_v)
+		
+		_t_q_exp_l = _t_q_exp.GetLength()-1
+		for i in range(_t_q_exp_v_l-_t_q_exp_l):
+			_t_q_exp.Append(False)
+		
+		#Calculate _t_q sign
+		_t_q_sig = Binary([self.sign.__xor__(other.sign).data[0]])
+		
+		#Find leading one
+		largest_one = -1
+		for i in range(_t_q.GetLength()-1):
+			if _t_q.data[_t_q.GetLength()-1-i]:
+				largest_one = i
+				break
+		
+		#Pop leading one for floating point compliance
+		if largest_one == -1:
+			_t_q = Binary([False for i in range(_t_q.GetLength())])
+		else:
+			#Shift is how many bits was popped at the top
+			_t_q.LengthPop(largest_one+1, -1)
+			
+			shifted_b = Binary()
+			shifted_b.DoubleToBin(largest_one+1)
+			_t_q_exp -= shifted_b
+			
+			#resized is how many bits was popped at the bottom
+			resized = _t_q_mant_len-_t_q.GetLength()+1
+			i = 0
+			one = Binary([True])
+			while _t_q.data[0] != True and i < resized:
+				_t_q.LengthPop(1)
+				_t_q_exp -= one
+				i += 1
+		
+		return hpf(_t_q, _t_q_exp, _t_q_sig)
+	
 	def __repr__(self):
 		temp_mant = Binary(self.mant.data)
 		temp_mant.Append(True)
@@ -553,7 +628,7 @@ def test():
 	print(vb)
 	print(vb.__repr__())
 
-	vc = vb - va 
+	vc = va * vb 
 
 	#c
 	print("c:")
@@ -571,7 +646,7 @@ def test():
 	print(vb)
 	print(vb.__repr__())
 
-	vc = va - vb 
+	vc = va * vb 
 	print("c:")
 	print(vc)
 	print(vc.__repr__())
@@ -586,7 +661,8 @@ def test():
 
 	#c
 	print("c:")
-	vc = vb - va
+	vc = vb * va
 	print(vc)
 	print(vc.__repr__())
 
+test()
