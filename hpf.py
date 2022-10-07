@@ -665,4 +665,27 @@ def test():
 	print(vc)
 	print(vc.__repr__())
 
-test()
+# test()
+
+def test_two():
+	a = hpf()
+	a.exp = Binary([0,1])
+	a.sign = Binary([1])
+	
+	b = hpf()
+	b.exp = Binary([0,1])
+	b.sign = Binary([1])
+	
+	# for i in range(1000):
+		# if i % 2 == 0:
+			# c = a + b 
+			# b = c
+		# else:
+			# c = a + b
+			# a = c
+	
+	c = a + b
+	
+	print("a: %s, b: %s, c: %s" % (a.__str__(), b.__str__(), c.__str__()))
+
+test_two()
