@@ -370,11 +370,11 @@ class hpf:
 		_new_self = hpf(self.mant, self.exp, self.sign)
 		_new_other = hpf(other.mant, other.exp, other.sign)
 		
+		_new_self_exp_v  = 2**(_new_self.exp.GetLength()-1)-_new_self.exp.ToInt()
+		_new_other_exp_v = 2**(_new_other.exp.GetLength()-1)-_new_other.exp.ToInt()
+		
 		#Check which has the largest value
-		if _new_self.exp.ToInt() < _new_other.exp.ToInt():
-			_t_q_exp = _new_self.exp
-		else:
-			_t_q_exp = _new_other.exp
+		_t_q_exp_v = _new_self_exp_v * (_new_self_exp_v > _new_other_exp_v) + _new_other_exp_v * (_new_self_exp_v <= _new_other_exp_v)
 		
 		#Get lengths of mantissa
 		_new_self_mant_len = _new_self.mant.GetLength()
@@ -386,9 +386,9 @@ class hpf:
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
 		if reverse_shift:	#Get longest mantissa length based on reverse_shift
-			_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
+			_t_q_mant_len = _o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
 		else:
-			_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len < _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len >= _new_other_mant_len)
+			_t_q_mant_len = _o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len < _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len >= _new_other_mant_len)
 		
 		#Add mantissa
 		_t_q_mant = _new_self.mant.__float_add__(_new_other.mant)
@@ -397,34 +397,46 @@ class hpf:
 		#Handle carry out
 		if _t_q_mant.co:
 			_t_q_mant.Append(True)
-			_t_q_mant_len += 1
-			_t_q_exp -= one
+			_t_q_mant_len = _t_q_mant.GetLength()
+			_t_q_exp_v += 1
 		
 		#Find leading one
 		largest_one = -1
-		for i in range(_t_q_mant_len):
+		for i in range(_t_q_mant.GetLength()-1, -1, -1):
 			if _t_q_mant.data[i]:
 				largest_one = i
 				break
 		
 		#Pop leading one for floating point compliance
-		if largest_one == -1:
-			_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
-		else:
-			#Shift is how many bits was popped at the top
-			_t_q_mant.LengthPop(largest_one+1, -1)
+		#Shift is how many bits was popped at the top 
+		if largest_one != -1:
+			popped = _t_q_mant_len-(largest_one)
+			_t_q_mant.LengthPop(popped, -1)
 			
-			shifted_b = Binary()
-			shifted_b.DoubleToBin(largest_one+1)
-			_t_q_exp -= shifted_b
-			
-			#resized is how many bits was popped at the bottom
-			resized = _t_q_mant.GetLength()-_t_q_mant_len
-			i = 0
+			if popped > 1:
+				_t_q_exp_v -= popped-1
+		
+		#resized is how many bits was popped at the bottom
+		resized = _o_t_q_mant_len-_t_q_mant_len
+		i = 0
+		try:
 			while _t_q_mant.data[_t_q_mant.GetLength()-1] != True and i < resized:
 				_t_q_mant.LengthPop(1)
-				_t_q_exp -= one
+				_t_q_exp_v += 1
 				i += 1
+		except IndexError:
+			pass
+		
+		_t_q_exp_v_l = 0
+		while 2**_t_q_exp_v_l <= abs(_t_q_exp_v):
+			_t_q_exp_v_l += 1
+		_t_q_exp_v_l += 1
+		
+		_t_q_exp = Binary()
+		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-abs(_t_q_exp_v))
+		_t_q_exp_l = _t_q_exp.GetLength()-1
+		for i in range(_t_q_exp_v_l-_t_q_exp_l):
+			_t_q_exp.Append(False)
 		
 		return hpf(_t_q_mant, _t_q_exp, self.sign)
 	def __pure_sub__(self, other):
@@ -527,8 +539,13 @@ class hpf:
 		_new_other.mant.Append(True)
 		
 		#Make _t_q object for computation
-		_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()+1
+		_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()
 		_t_q = Binary([False for i in range(_t_q_mant_len)])
+		
+		#Calculate exponent values
+		_new_self_exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
+		_new_other_exp_v = 2**(other.exp.GetLength()-1)-other.exp.ToInt()
+		_t_q_exp_v = _new_self_exp_v + _new_other_exp_v
 		
 		#Calculate multiplication of mantissa
 		co_offset = 0
@@ -538,25 +555,9 @@ class hpf:
 				_t_q = _t_q_mant + _t_other
 				if _t_q.co:
 					co_offset += 1
+					_t_q_exp_v += 1
 					_t_q.Append(True)
 		
-		#Calculate exponent values
-		_new_self_exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
-		_new_other_exp_v = 2**(other.exp.GetLength()-1)-other.exp.ToInt()
-		
-		#Calculate _t_q_exp
-		_t_q_exp_v = _new_self_exp_v + _new_other_exp_v
-		_t_q_exp_v_l = 0
-		while 2**_t_q_exp_v_l <= _t_q_exp_v:
-			_t_q_exp_v_l += 1
-		_t_q_exp_v_l += 1
-		
-		_t_q_exp = Binary()
-		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-_t_q_exp_v)
-		
-		_t_q_exp_l = _t_q_exp.GetLength()-1
-		for i in range(_t_q_exp_v_l-_t_q_exp_l):
-			_t_q_exp.Append(False)
 		
 		#Calculate _t_q sign
 		_t_q_sig = Binary([self.sign.__xor__(other.sign).data[0]])
@@ -575,20 +576,52 @@ class hpf:
 			#Shift is how many bits was popped at the top
 			_t_q.LengthPop(largest_one+1, -1)
 			
-			shifted_b = Binary()
-			shifted_b.DoubleToBin(largest_one+1)
-			_t_q_exp -= shifted_b
+			_t_q_exp_v += largest_one
 			
 			#resized is how many bits was popped at the bottom
-			resized = _t_q_mant_len-_t_q.GetLength()+1
+			resized = _t_q_mant_len-_t_q.GetLength()
 			i = 0
-			one = Binary([True])
 			while _t_q.data[0] != True and i < resized:
 				_t_q.LengthPop(1)
-				_t_q_exp -= one
+				# _t_q_exp_v += 1
 				i += 1
 		
+		#Calculate _t_q_exp
+		_t_q_exp_v_l = 0
+		while 2**_t_q_exp_v_l <= abs(_t_q_exp_v):
+			_t_q_exp_v_l += 1
+		_t_q_exp_v_l += 1
+		
+		_t_q_exp = Binary()
+		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-(_t_q_exp_v))
+		
+		_t_q_exp_l = _t_q_exp.GetLength()-1
+		for i in range(_t_q_exp_v_l-_t_q_exp_l):
+			_t_q_exp.Append(_t_q_exp_v >= 0)
+		
 		return hpf(_t_q, _t_q_exp, _t_q_sig)
+	def __r_div__(self, other, set_precision=False):
+		#Clone hpf objects to new temporary variables to not mess with original objects
+		_new_self = hpf(self.mant, self.exp, self.sign)
+		_new_other = hpf(other.mant, other.exp, other.sign)
+		
+		_new_self_mant_len = _new_self.mant.GetLength()
+		_new_other_mant_len = _new_other.mant.GetLength()
+		
+		#Add leading one for computation
+		_new_self.mant.Append(True)
+		_new_other.mant.Append(True)
+		
+		if set_precision:
+			_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
+			_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
+		else:
+			_t_q_mant_len = set_precision
+			_t_q_mant = Binary([False for i in range(set_precision)])
+		
+		for i in range(_t_q_mant_len):
+			pass
+		
 	
 	def __repr__(self):
 		temp_mant = Binary(self.mant.data)
@@ -601,73 +634,68 @@ class hpf:
 	def __str__(self):
 		temp_mant = Binary(self.mant.data)
 		temp_mant.Append(True)
-		exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
-		v = 2**exp_v*temp_mant.ToInt()/(2**(temp_mant.GetLength()-1))
-		if self.sign.data[0] == True:
-			return "+%s" % (v)
-		else:
-			return "-%s" % (v)
+		try:
+			exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
+			v = 2**exp_v*temp_mant.ToInt()/(2**(temp_mant.GetLength()-1))
+		except OverflowError:
+			v = "Infinity"
+		sign = "-" * (self.sign.data[0] == False)
+		return sign + str(v)
 
 def test():
 	va = hpf()
 	vb = hpf()
 
-	#a = 15
-	va.mant = Binary([1,1,1])
-	va.exp = Binary([1,0,0])
+	#a = .1
+	va.mant = Binary([1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1])
+	va.exp = Binary([0,0,1,1])
 	va.sign = Binary([False])
-	print("a:")
-	print(va)
+	print("a: %s" % (va))
 	print(va.__repr__())
 
 	#b = 5
 	vb.mant = Binary([1,0])
 	vb.exp = Binary([0,1,0])
 	vb.sign = Binary([True])
-	print("b:")
-	print(vb)
+	print("b: %s" % (vb))
 	print(vb.__repr__())
 
 	vc = va * vb 
 
 	#c
-	print("c:")
-	print(vc)
+	print("c: %s" % (vc))
 	print(vc.__repr__())
 
 	#b = 3
-	vb.mant = Binary([0,1])
-	vb.exp = Binary([1,1,0])
+	vb.mant = Binary([1])
+	vb.exp = Binary([1,0])
 	vb.sign = Binary([True])
-	print("a:")
-	print(va)
+	print("a: %s" % (va))
 	print(va.__repr__())
-	print("b:")
-	print(vb)
+	print("b: %s" % (vb))
 	print(vb.__repr__())
 
 	vc = va * vb 
-	print("c:")
-	print(vc)
+	print("c: %s" % (vc))
 	print(vc.__repr__())
 
 	#b = 1.1
-	vb.mant = Binary([1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
+	vb.mant = Binary([1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
 	vb.exp = Binary([0,1])
 	vb.sign = Binary([True])
-	print("b:")
-	print(vb)
+	print("a: %s" % (va))
+	print(va.__repr__())
+	print("b: %s" % (vb))
 	print(vb.__repr__())
 
 	#c
-	print("c:")
 	vc = vb * va
-	print(vc)
+	print("c: %s" % (vc))
 	print(vc.__repr__())
 
 # test()
 
-def test_two():
+def Fibonacci():
 	a = hpf()
 	a.exp = Binary([0,1])
 	a.sign = Binary([1])
@@ -676,16 +704,11 @@ def test_two():
 	b.exp = Binary([0,1])
 	b.sign = Binary([1])
 	
-	# for i in range(1000):
-		# if i % 2 == 0:
-			# c = a + b 
-			# b = c
-		# else:
-			# c = a + b
-			# a = c
-	
-	c = a + b
-	
-	print("a: %s, b: %s, c: %s" % (a.__str__(), b.__str__(), c.__str__()))
-
-test_two()
+	for i in range(100000):
+		if i % 2 == 0:
+			a = a + b 
+			print(a)
+		else:
+			b = a + b
+			print(b)
+	return 1
