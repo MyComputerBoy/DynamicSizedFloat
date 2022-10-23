@@ -231,6 +231,19 @@ class Binary:
 				_new_other_bin.InverseLengthAppend(offset)
 		
 		return _new_self_bin, _new_other_bin
+	def DivAllign(self, other, offset=0):
+		#Clone Binary objects to new temporary variables to not mess with original objects
+		_new_self_bin = Binary(self.data)
+		_new_other_bin = Binary(other.data)
+		
+		#Get lengths
+		_self_len = _new_self_bin.GetLength()
+		_other_len = _new_other_bin.GetLength()
+		
+		_new_self_bin.InverseLengthAppend(offset)
+		_new_other_bin.LengthAppend(offset)
+		
+		return _new_self_bin, _new_other_bin
 	
 	def Append(self, value=False):
 		self.data.append(value)
@@ -597,10 +610,10 @@ class hpf:
 		
 		_t_q_exp_l = _t_q_exp.GetLength()-1
 		for i in range(_t_q_exp_v_l-_t_q_exp_l):
-			_t_q_exp.Append(_t_q_exp_v >= 0)
+			_t_q_exp.Append(_t_q_exp_v <= 0)
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig)
-	def __r_div__(self, other, set_precision=False):
+	def __truediv__(self, other, set_precision=False):
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign)
 		_new_other = hpf(other.mant, other.exp, other.sign)
@@ -612,16 +625,66 @@ class hpf:
 		_new_self.mant.Append(True)
 		_new_other.mant.Append(True)
 		
-		if set_precision:
-			_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
-			_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
-		else:
+		#Calculate exponent values
+		_new_self_exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
+		_new_other_exp_v = 2**(other.exp.GetLength()-1)-other.exp.ToInt()
+		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
+		print("_t_q_exp_v: %s" % (_t_q_exp_v))
+		
+		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
+		# print("_new_self.mant:  %s" % (_new_self.mant))
+		# print("_new_other.mant: %s" % (_new_other.mant))
+		
+		if type(set_precision) != type(False):
 			_t_q_mant_len = set_precision
-			_t_q_mant = Binary([False for i in range(set_precision)])
+		else:
+			_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
+		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		
+		offs = 0
 		for i in range(_t_q_mant_len):
-			pass
+			_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, offs)
+			offs += 1
+			# print("_t_self_mant:  %s" % (_t_self_mant))
+			# print("_t_other_mant: %s" % (_t_other_mant))
+			_t_sub_res = _t_self_mant - _t_other_mant
+			if _t_sub_res.co:
+				# print("\n--Positive--")
+				offs = 1
+				_t_q_mant.data[_t_q_mant.GetLength()-i] = True
+				_new_self.mant = _t_sub_res
 		
+		#Find leading one
+		largest_one = -1
+		for i in range(_t_q_mant.GetLength()-1):
+			if _t_q_mant.data[_t_q_mant.GetLength()-1-i]:
+				largest_one = i
+				break
+		
+		#Pop leading one for floating point compliance
+		if largest_one == -1:
+			_t_q_mant = Binary([False for i in range(_t_q_mant.GetLength())])
+		else:
+			#Shift is how many bits was popped at the top
+			_t_q_mant.LengthPop(largest_one+1, -1)
+			
+			_t_q_exp_v += largest_one-1
+		
+		#Calculate _t_q_exp
+		_t_q_exp_v_l = 0
+		while 2**_t_q_exp_v_l <= abs(_t_q_exp_v):
+			_t_q_exp_v_l += 1
+		_t_q_exp_v_l += 1
+		
+		_t_q_exp = Binary()
+		print("_t_q_exp_v: %s" % (_t_q_exp_v))
+		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-(_t_q_exp_v))
+		
+		_t_q_exp_l = _t_q_exp.GetLength()-1
+		for i in range(_t_q_exp_v_l-_t_q_exp_l):
+			_t_q_exp.Append(_t_q_exp_v <= 0)
+		
+		return hpf(_t_q_mant, _t_q_exp, _new_self.sign)
 	
 	def __repr__(self):
 		temp_mant = Binary(self.mant.data)
@@ -646,28 +709,29 @@ def test():
 	va = hpf()
 	vb = hpf()
 
-	#a = .1
-	va.mant = Binary([1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1])
-	va.exp = Binary([0,0,1,1])
-	va.sign = Binary([False])
+	#a = 355
+	va.mant = Binary([1,1,0,0,0,1,1,0])
+	va.exp = Binary([0,0,0,0])
+	va.sign = Binary([True])
 	print("a: %s" % (va))
 	print(va.__repr__())
 
-	#b = 5
-	vb.mant = Binary([1,0])
-	vb.exp = Binary([0,1,0])
+	#b = 113
+	vb.mant = Binary([1,0,0,0,1,1])
+	vb.exp = Binary([0,1,0,0])
 	vb.sign = Binary([True])
 	print("b: %s" % (vb))
 	print(vb.__repr__())
 
-	vc = va * vb 
+	vc = va.__truediv__(vb, 1000) 
 
 	#c
 	print("c: %s" % (vc))
 	print(vc.__repr__())
+	print("\n")
 
-	#b = 3
-	vb.mant = Binary([1])
+	#b = 3.14159265358979
+	vb.mant = Binary([1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,1,0,0,1,0,0,1])
 	vb.exp = Binary([1,0])
 	vb.sign = Binary([True])
 	print("a: %s" % (va))
@@ -675,9 +739,10 @@ def test():
 	print("b: %s" % (vb))
 	print(vb.__repr__())
 
-	vc = va * vb 
+	vc = va * vc
 	print("c: %s" % (vc))
 	print(vc.__repr__())
+	print("\n")
 
 	#b = 1.1
 	vb.mant = Binary([1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
@@ -693,7 +758,7 @@ def test():
 	print("c: %s" % (vc))
 	print(vc.__repr__())
 
-# test()
+test()
 
 def Fibonacci():
 	a = hpf()
