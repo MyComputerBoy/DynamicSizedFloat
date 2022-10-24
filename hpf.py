@@ -123,10 +123,10 @@ class Binary:
 		
 		return Binary(q)
 	
-	def __add__(self, other, ci=False):
+	def __pure_add__(self, other, ci=False):
 		#Clone Binary objects to new temporary variables to not mess with original objects
-		_new_self_bin = Binary(self.data)
-		_new_other_bin = Binary(other.data)
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
 		
 		#Allign sizes for compatible addition
 		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin)
@@ -141,11 +141,11 @@ class Binary:
 			q[i] = (xo + ci) % 2
 			at = xo * ci 
 			ci = m.ceil(ao/2 + at/2)
-		return Binary(q, ci)
-	def __sub__(self, other, ci=True):
+		return Binary(q, ci, self.sign)
+	def __pure_sub__(self, other, ci=True):
 		#Clone Binary objects to new temporary variables to not mess with original objects
-		_new_self_bin = Binary(self.data)
-		_new_other_bin = Binary(other.data)
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
 		
 		#Allign sizes for compatible addition
 		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin)
@@ -160,7 +160,29 @@ class Binary:
 			q[i] = (xo + ci) % 2
 			at = xo * ci 
 			ci = m.ceil(ao/2 + at/2)
-		return Binary(q, ci)
+		return Binary(q, ci, ci)
+	
+	def __add__(self, other):
+		if self.sign:
+			if other.sign:
+				return self.__pure_add__(other)
+			return self.__pure_sub__(other)
+		if other.sign:
+			return other.__pure_sub__(self)
+		_t_q = self.__pure_add__(other)
+		_t_q.sign = False
+		return _t_q
+	def __sub__(self, other):
+		if self.sign:
+			if other.sign:
+				return self.__pure_sub__(other)
+			return other.__pure_sub__(self)
+		if other.sign:
+			_t_q = self.__pure_add__(other)
+			_t_q.sign = False
+		_t_q = self.__pure_sub__(other)
+		_t_q.sign = not _t_q.sign
+		return _t_q
 	
 	def __float_add__(self, other, ci=False):
 		#Clone Binary objects to new temporary variables to not mess with original objects
@@ -277,26 +299,203 @@ class Binary:
 	def DoubleToBin(self, a, precision=0):
 		t = []
 		xl = 0
-		while 2**xl < a:
+		while 2**xl <= a:
 			xl += 1
 		for i in range(xl+precision):
 			t.append(a % 2)
 			if a % 2 == 1:
 				a -= 1
 			a /= 2
+		
 		self.data = t
 	
 	def GetLength(self):
 		return len(self.data)
 	
-	def __repr__(self):
-		return "Binary: " + str(self.ToInt())
+	def __eq__(self, other):
+		#Clone Binary objects to new temporary variables to not mess with original objects
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
+		
+		#Naive check by sign
+		if _new_self_bin.sign != _new_other_bin.sign:
+			return False
+		
+		#Allign mantissa
+		_self_bin, _other_bin = _new_self_bin.Allign(_new_other_bin)
+		
+		#Iterate over bits from top down
+		_max = _self_bin.GetLength()-1
+		for i in range(_max+1):
+			#If self is larger
+			if _self_bin.data[_max-i] == True and _other_bin.data[_max-i] != True:
+				return False
+			#If other is larger
+			if _self_bin.data[_max-i] != True and _other_bin.data[_max-i] == True:
+				return False
+		
+		return True
+	def __gt__(self, other):
+		#Clone Binary objects to new temporary variables to not mess with original objects
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
+		
+		#Naive check by sign
+		if _new_self_bin.sign == True and _new_other_bin.sign != True:
+			return True
+		elif _new_self_bin.sign != True and _new_other_bin.sign == True:
+			return False
+		
+		#Allign mantissa
+		_self_bin, _other_bin = _new_self_bin.Allign(_new_other_bin)
+		
+		#Iterate over bits from top down
+		_max = _self_bin.GetLength()-1
+		for i in range(_max+1):
+			#If self is larger
+			if _self_bin.data[_max-i] == True and _other_bin.data[_max-i] != True:
+				return True
+			#If other is larger
+			if _self_bin.data[_max-i] != True and _other_bin.data[_max-i] == True:
+				return False
+		
+		return False
+	def __ge__(self, other):
+		#Clone Binary objects to new temporary variables to not mess with original objects
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
+		
+		#Naive check by sign
+		if _new_self_bin.sign == True and _new_other_bin.sign != True:
+			return True
+		elif _new_self_bin.sign != True and _new_other_bin.sign == True:
+			return False
+		
+		#Allign mantissa
+		_self_bin, _other_bin = _new_self_bin.Allign(_new_other_bin)
+		
+		#Iterate over bits from top down
+		_max = _self_bin.GetLength()-1
+		for i in range(_max+1):
+			#If self is larger
+			if _self_bin.data[_max-i] == True and _other_bin.data[_max-i] != True:
+				return True
+			#If other is larger
+			if _self_bin.data[_max-i] != True and _other_bin.data[_max-i] == True:
+				return False
+		
+		return True
+	def __lt__(self, other):
+		#Clone Binary objects to new temporary variables to not mess with original objects
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
+		
+		#Naive check by sign
+		if _new_self_bin.sign == True and _new_other_bin.sign != True:
+			return False
+		elif _new_self_bin.sign != True and _new_other_bin.sign == True:
+			return True
+		
+		#Allign mantissa
+		_self_bin, _other_bin = _new_self_bin.Allign(_new_other_bin)
+		
+		#Iterate over bits from top down
+		_max = _self_bin.GetLength()-1
+		for i in range(_max+1):
+			#If self is larger
+			if _self_bin.data[_max-i] == True and _other_bin.data[_max-i] != True:
+				return False
+			#If other is larger
+			if _self_bin.data[_max-i] != True and _other_bin.data[_max-i] == True:
+				return True
+		
+		return False
+	def __le__(self, other):
+		#Clone Binary objects to new temporary variables to not mess with original objects
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
+		
+		#Naive check by sign
+		if _new_self_bin.sign == True and _new_other_bin.sign != True:
+			return False
+		elif _new_self_bin.sign != True and _new_other_bin.sign == True:
+			return True
+		
+		#Allign mantissa
+		_self_bin, _other_bin = _new_self_bin.Allign(_new_other_bin)
+		
+		#Iterate over bits from top down
+		_max = _self_bin.GetLength()-1
+		for i in range(_max+1):
+			#If self is larger
+			if _self_bin.data[_max-i] == True and _other_bin.data[_max-i] != True:
+				return False
+			#If other is larger
+			if _self_bin.data[_max-i] != True and _other_bin.data[_max-i] == True:
+				return True
+		
+		return True
+	def __ne__(self, other):
+		#Clone Binary objects to new temporary variables to not mess with original objects
+		_new_self_bin = Binary(self.data, self.co, self.sign)
+		_new_other_bin = Binary(other.data, other.co, other.sign)
+		
+		#Naive check by sign
+		if _new_self_bin.sign == True and _new_other_bin.sign != True:
+			return True
+		elif _new_self_bin.sign != True and _new_other_bin.sign == True:
+			return True
+		
+		#Allign mantissa
+		_self_bin, _other_bin = _new_self_bin.Allign(_new_other_bin)
+		
+		#Iterate over bits from top down
+		_max = _self_bin.GetLength()-1
+		for i in range(_max+1):
+			#If self is larger
+			if _self_bin.data[_max-i] == True and _other_bin.data[_max-i] != True:
+				return True
+			#If other is larger
+			if _self_bin.data[_max-i] != True and _other_bin.data[_max-i] == True:
+				return True
+		
+		return False
 	
-	def __str__(self):
-		_str = "0b"
+	def Abs(self):
+		return Binary(self.data, self.co, True)
+	
+	def __repr__(self):
+		_str = ("-" * (self.sign == False)) + "0b"
 		for bit in self.data:
 			_str += "1" if bit else "0"
 		return _str
+	
+	def __str__(self):
+		return str(self.ToInt() * (1 * self.sign + -1 * (not self.sign)))
+
+def ReturnableDoubleToBin(a, precision=0):
+		t = []
+		xl = 0
+		while 2**xl <= a:
+			xl += 1
+		for i in range(xl+precision):
+			t.append(a % 2)
+			if a % 2 == 1:
+				a -= 1
+			a /= 2
+		
+		return Binary(t)
+
+def TwosPow( n):
+	q    = Binary([True])
+	Zero = Binary([False], False, True)
+	One  = Binary([True], False, True)
+	while n > Zero:
+		q.InverseAppend(False)
+		n -= One
+		n.sign = n.co
+	
+	return q
 
 @dataclass
 class hpf:
@@ -396,12 +595,13 @@ class hpf:
 		#Allign mantissa
 		_new_self, _new_other, reverse_shift = _new_self.Allign(_new_other)
 		
+		#Get longest mantissa length based on reverse_shift
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
-		if reverse_shift:	#Get longest mantissa length based on reverse_shift
-			_t_q_mant_len = _o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
+		if reverse_shift:	
+			_o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
 		else:
-			_t_q_mant_len = _o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len < _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len >= _new_other_mant_len)
+			_o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len < _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len >= _new_other_mant_len)
 		
 		#Add mantissa
 		_t_q_mant = _new_self.mant.__float_add__(_new_other.mant)
@@ -410,46 +610,44 @@ class hpf:
 		#Handle carry out
 		if _t_q_mant.co:
 			_t_q_mant.Append(True)
-			_t_q_mant_len = _t_q_mant.GetLength()
 			_t_q_exp_v += 1
 		
 		#Find leading one
 		largest_one = -1
-		for i in range(_t_q_mant.GetLength()-1, -1, -1):
-			if _t_q_mant.data[i]:
+		_max = _t_q_mant.GetLength()-1
+		for i in range(_max):
+			if _t_q_mant.data[_max-i]:
 				largest_one = i
 				break
 		
 		#Pop leading one for floating point compliance
 		#Shift is how many bits was popped at the top 
 		if largest_one != -1:
-			popped = _t_q_mant_len-(largest_one)
-			_t_q_mant.LengthPop(popped, -1)
+			popped = largest_one
+			_t_q_mant.LengthPop(popped+1, -1)
 			
-			if popped > 1:
-				_t_q_exp_v -= popped-1
+			_t_q_exp_v += popped
 		
-		#resized is how many bits was popped at the bottom
-		resized = _o_t_q_mant_len-_t_q_mant_len
-		i = 0
-		try:
-			while _t_q_mant.data[_t_q_mant.GetLength()-1] != True and i < resized:
-				_t_q_mant.LengthPop(1)
-				_t_q_exp_v += 1
-				i += 1
-		except IndexError:
-			pass
+		# #resized is how many bits was popped at the bottom
+		# resized = _o_t_q_mant_len-_t_q_mant.GetLength()
+		# i = 0
+		# try:
+			# while _t_q_mant.data[0] != True and i < resized:
+				# _t_q_mant.LengthPop(1)
+				# # _t_q_exp_v += 1
+				# i += 1
+		# except IndexError:
+			# pass
 		
 		_t_q_exp_v_l = 0
 		while 2**_t_q_exp_v_l <= abs(_t_q_exp_v):
 			_t_q_exp_v_l += 1
 		_t_q_exp_v_l += 1
 		
-		_t_q_exp = Binary()
-		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-abs(_t_q_exp_v))
+		_t_q_exp = ReturnableDoubleToBin(2**(_t_q_exp_v_l)-(_t_q_exp_v))
 		_t_q_exp_l = _t_q_exp.GetLength()-1
 		for i in range(_t_q_exp_v_l-_t_q_exp_l):
-			_t_q_exp.Append(False)
+			_t_q_exp.Append(_t_q_exp_v <= 0)
 		
 		return hpf(_t_q_mant, _t_q_exp, self.sign)
 	def __pure_sub__(self, other):
@@ -506,8 +704,7 @@ class hpf:
 			#Shift is how many bits was popped at the top
 			_t_q_mant.LengthPop(largest_one+1, -1)
 			
-			shifted_b = Binary()
-			shifted_b.DoubleToBin(largest_one+1)
+			shifted_b = ReturnableDoubleToBin(largest_one+1)
 			_t_q_exp -= shifted_b
 			
 			#resized is how many bits was popped at the bottom
@@ -573,12 +770,13 @@ class hpf:
 		
 		
 		#Calculate _t_q sign
-		_t_q_sig = Binary([self.sign.__xor__(other.sign).data[0]])
+		_t_q_sig = Binary([self.sign.data[0] and other.sign.data[0]])
 		
 		#Find leading one
 		largest_one = -1
-		for i in range(_t_q.GetLength()-1):
-			if _t_q.data[_t_q.GetLength()-1-i]:
+		_max = _t_q.GetLength()-1
+		for i in range(_max):
+			if _t_q.data[_max-i]:
 				largest_one = i
 				break
 		
@@ -605,8 +803,7 @@ class hpf:
 			_t_q_exp_v_l += 1
 		_t_q_exp_v_l += 1
 		
-		_t_q_exp = Binary()
-		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-(_t_q_exp_v))
+		_t_q_exp = ReturnableDoubleToBin(2**(_t_q_exp_v_l)-(_t_q_exp_v))
 		
 		_t_q_exp_l = _t_q_exp.GetLength()-1
 		for i in range(_t_q_exp_v_l-_t_q_exp_l):
@@ -614,6 +811,10 @@ class hpf:
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig)
 	def __truediv__(self, other, set_precision=False):
+		bin = Binary()
+		One = Binary([True])
+		Zero = Binary([False])
+		
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign)
 		_new_other = hpf(other.mant, other.exp, other.sign)
@@ -626,63 +827,79 @@ class hpf:
 		_new_other.mant.Append(True)
 		
 		#Calculate exponent values
-		_new_self_exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
-		_new_other_exp_v = 2**(other.exp.GetLength()-1)-other.exp.ToInt()
+		#Zero out exp values for length and value calculations
+		_self_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
+		_other_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
+		
+		#Add leading ones back in within the size of the exponents
+		_other_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
+		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
+		
+		#Calculate actual values of exponents
+		_new_self_exp_v  = _self_exp_l_bin-self.exp
+		_new_other_exp_v = _other_exp_l_bin-other.exp
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
-		print("_t_q_exp_v: %s" % (_t_q_exp_v))
 		
+		#Allign mantissas
 		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
-		# print("_new_self.mant:  %s" % (_new_self.mant))
-		# print("_new_other.mant: %s" % (_new_other.mant))
 		
+		#Set _t_q_mant_len based on set_precision
 		if type(set_precision) != type(False):
 			_t_q_mant_len = set_precision
 		else:
-			_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
+			_t_q_mant_len = _new_self_mant_len + _new_other_mant_len
 		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		
+		#Calculate actual division
 		offs = 0
-		for i in range(_t_q_mant_len):
+		for i in range(_t_q_mant_len-1):
 			_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, offs)
 			offs += 1
-			# print("_t_self_mant:  %s" % (_t_self_mant))
-			# print("_t_other_mant: %s" % (_t_other_mant))
 			_t_sub_res = _t_self_mant - _t_other_mant
+			
+			#If subtraction is positive
 			if _t_sub_res.co:
-				# print("\n--Positive--")
 				offs = 1
-				_t_q_mant.data[_t_q_mant.GetLength()-i] = True
+				_t_q_mant.data[_t_q_mant.GetLength()-1-i] = True
 				_new_self.mant = _t_sub_res
 		
 		#Find leading one
 		largest_one = -1
-		for i in range(_t_q_mant.GetLength()-1):
-			if _t_q_mant.data[_t_q_mant.GetLength()-1-i]:
+		_max = _t_q_mant.GetLength()-1
+		for i in range(_max):
+			if _t_q_mant.data[_max-i]:
 				largest_one = i
 				break
 		
 		#Pop leading one for floating point compliance
-		if largest_one == -1:
-			_t_q_mant = Binary([False for i in range(_t_q_mant.GetLength())])
-		else:
+		if largest_one != -1:
 			#Shift is how many bits was popped at the top
 			_t_q_mant.LengthPop(largest_one+1, -1)
 			
-			_t_q_exp_v += largest_one-1
+			_bin_largest_one = ReturnableDoubleToBin(largest_one)
+			_t_q_exp_v += _bin_largest_one
+			bin = Binary()
 		
 		#Calculate _t_q_exp
-		_t_q_exp_v_l = 0
-		while 2**_t_q_exp_v_l <= abs(_t_q_exp_v):
-			_t_q_exp_v_l += 1
-		_t_q_exp_v_l += 1
+		_t_q_exp_v_l = Binary()
+		while TwosPow(_t_q_exp_v_l) < _t_q_exp_v.Abs():
+			_t_q_exp_v_l += One
+		_t_q_exp_v_l += One
 		
-		_t_q_exp = Binary()
-		print("_t_q_exp_v: %s" % (_t_q_exp_v))
-		_t_q_exp.DoubleToBin(2**(_t_q_exp_v_l)-(_t_q_exp_v))
+		#Remove leading zeros for propper calculation
+		_t_q_exp = TwosPow(_t_q_exp_v_l)-_t_q_exp_v
+		while _t_q_exp.data[_t_q_exp.GetLength()-1] != True:
+			_t_q_exp.Pop(_t_q_exp.GetLength()-1)
 		
-		_t_q_exp_l = _t_q_exp.GetLength()-1
-		for i in range(_t_q_exp_v_l-_t_q_exp_l):
-			_t_q_exp.Append(_t_q_exp_v <= 0)
+		#Calculate _t_q_exp_l
+		_t_q_exp_l = _t_q_exp.__xor__(_t_q_exp)
+		_t_q_exp_l.data[_t_q_exp.GetLength()-1] = True
+		
+		#Add leading zero for propper exponent value
+		i = _t_q_exp_v_l-_t_q_exp_l
+		while i > Zero:
+			_t_q_exp.Append(_t_q_exp_v < Zero)
+			i -= One
 		
 		return hpf(_t_q_mant, _t_q_exp, _new_self.sign)
 	
@@ -690,9 +907,9 @@ class hpf:
 		temp_mant = Binary(self.mant.data)
 		temp_mant.Append(True)
 		if self.sign.data:
-			return "+%s|%s" % (str(self.exp), str(self.mant))
+			return "+%s|%s" % (self.exp.__repr__(), self.mant.__repr__())
 		else:
-			return "-%s|%s" % (str(self.exp), str(self.mant))
+			return "-%s|%s" % (self.exp.__repr__(), self.mant.__repr__())
 	
 	def __str__(self):
 		temp_mant = Binary(self.mant.data)
@@ -706,61 +923,31 @@ class hpf:
 		return sign + str(v)
 
 def test():
-	va = hpf()
-	vb = hpf()
+	a = hpf()
+	b = hpf()
+	tb = Binary()
+	
+	#a = 1
+	a.mant = Binary([0])
+	a.exp  = Binary([0,1])
+	a.sign = Binary([1])
+	print("a: %s, a.__repr__(): %s" % (str(a), a.__repr__()))
+	
+	#b = 10
+	b.mant = Binary([1,0])
+	b.exp  = Binary([1,0,0])
+	b.sign = Binary([1])
+	print("b: %s, b.__repr__(): %s" % (str(b), b.__repr__()))
+	
+	c = a.__truediv__(b, 50) 
+	print("c: %s, c.__repr__(): %s" % (str(c), c.__repr__()))
+	
+	c = b * c
+	print("c: %s, c.__repr__(): %s" % (str(c), c.__repr__()))
+	
+# test()
 
-	#a = 355
-	va.mant = Binary([1,1,0,0,0,1,1,0])
-	va.exp = Binary([0,0,0,0])
-	va.sign = Binary([True])
-	print("a: %s" % (va))
-	print(va.__repr__())
-
-	#b = 113
-	vb.mant = Binary([1,0,0,0,1,1])
-	vb.exp = Binary([0,1,0,0])
-	vb.sign = Binary([True])
-	print("b: %s" % (vb))
-	print(vb.__repr__())
-
-	vc = va.__truediv__(vb, 1000) 
-
-	#c
-	print("c: %s" % (vc))
-	print(vc.__repr__())
-	print("\n")
-
-	#b = 3.14159265358979
-	vb.mant = Binary([1,1,1,0,1,1,1,1,1,1,1,0,0,0,0,1,0,0,1,0,0,1])
-	vb.exp = Binary([1,0])
-	vb.sign = Binary([True])
-	print("a: %s" % (va))
-	print(va.__repr__())
-	print("b: %s" % (vb))
-	print(vb.__repr__())
-
-	vc = va * vc
-	print("c: %s" % (vc))
-	print(vc.__repr__())
-	print("\n")
-
-	#b = 1.1
-	vb.mant = Binary([1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
-	vb.exp = Binary([0,1])
-	vb.sign = Binary([True])
-	print("a: %s" % (va))
-	print(va.__repr__())
-	print("b: %s" % (vb))
-	print(vb.__repr__())
-
-	#c
-	vc = vb * va
-	print("c: %s" % (vc))
-	print(vc.__repr__())
-
-test()
-
-def Fibonacci():
+def Fibonacci(iters=1001):
 	a = hpf()
 	a.exp = Binary([0,1])
 	a.sign = Binary([1])
@@ -769,11 +956,22 @@ def Fibonacci():
 	b.exp = Binary([0,1])
 	b.sign = Binary([1])
 	
-	for i in range(100000):
+	for i in range(iters):
 		if i % 2 == 0:
 			a = a + b 
-			print(a)
+			# print(a)
 		else:
 			b = a + b
-			print(b)
-	return 1
+			# print(b)
+	
+	c = a / b 
+	print(a)
+	# print(a.__repr__())
+	print(b)
+	# print(b.__repr__())
+	print(c)
+	print(c.__repr__())
+	
+	return a, b, c
+
+fa, fb, fc = Fibonacci()
