@@ -13,8 +13,16 @@ __sub__(self, other) -> sub override
 __float_add__(self, other) -> function for floating point add
 __float_sub__(self, other) -> function for floating point sub
 Allign(self, other, Inverse=False) -> function to allign mantissa for general functions, Inverse for floating point arithmetic
+DivAllign(self, other, offset=0) -> function to allign mantissa for divisions
 ToInt(self) -> function to convert Binary to int
 DoubleToBin(self, a, precision=0) -> function to convert double to Binary with arbitrary precision
+__eq__(self, other) -> equals comparison
+__gt__(self, other) -> greater than comparison
+__ge__(self, other) -> greater or equals comparison
+__lt__(self, other) -> less than comparison
+__le__(self, other) -> less or equals comparison
+__ne__(self, other) -> not equals comparison
+Abs(self) -> Absolute function, for omitting the sign for positive
 __repr__(self) -> representation override for Binary class
 __str__(self) -> string  representation override for Binary
 
@@ -26,6 +34,8 @@ __pure_add__(self, other) -> primitive function for add hpf
 __pure_sub__(self, other) -> primitive function for sub hpf
 __add__(self, other) -> full propper function to add arbitrary hpf
 __sub__(self, other) -> full propper function to sub arbitrary hpf
+__mul__(self, other) -> function for multiplication
+__truediv__(self, other) -> function for division
 __repr__(self) -> representation override for hpf
 __str__(self) -> string representation override for hpf
 """
@@ -740,6 +750,10 @@ class hpf:
 		return _t_q
 	
 	def __mul__(self, other, set_precision=False):
+		bin = Binary()
+		Zero = Binary([False])
+		One = Binary([True])
+		
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign)
 		_new_other = hpf(other.mant, other.exp, other.sign)
@@ -753,8 +767,17 @@ class hpf:
 		_t_q = Binary([False for i in range(_t_q_mant_len)])
 		
 		#Calculate exponent values
-		_new_self_exp_v = 2**(self.exp.GetLength()-1)-self.exp.ToInt()
-		_new_other_exp_v = 2**(other.exp.GetLength()-1)-other.exp.ToInt()
+		#Zero out exp values for length and value calculations
+		_self_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
+		_other_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
+		
+		#Add leading ones back in within the size of the exponents
+		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
+		_other_exp_l_bin.data[_other_exp_l_bin.GetLength()-1] = True
+		
+		#Calculate actual values of exponents
+		_new_self_exp_v  = _self_exp_l_bin-self.exp
+		_new_other_exp_v = _other_exp_l_bin-other.exp
 		_t_q_exp_v = _new_self_exp_v + _new_other_exp_v
 		
 		#Calculate multiplication of mantissa
@@ -765,7 +788,7 @@ class hpf:
 				_t_q = _t_q_mant + _t_other
 				if _t_q.co:
 					co_offset += 1
-					_t_q_exp_v += 1
+					# _t_q_exp_v += One
 					_t_q.Append(True)
 		
 		
@@ -787,27 +810,37 @@ class hpf:
 			#Shift is how many bits was popped at the top
 			_t_q.LengthPop(largest_one+1, -1)
 			
-			_t_q_exp_v += largest_one
+			_bin_largest_one = ReturnableDoubleToBin(largest_one)
+			# _t_q_exp_v += _bin_largest_one
 			
 			#resized is how many bits was popped at the bottom
 			resized = _t_q_mant_len-_t_q.GetLength()
 			i = 0
 			while _t_q.data[0] != True and i < resized:
 				_t_q.LengthPop(1)
-				# _t_q_exp_v += 1
+				# _t_q_exp_v += One
 				i += 1
 		
 		#Calculate _t_q_exp
-		_t_q_exp_v_l = 0
-		while 2**_t_q_exp_v_l <= abs(_t_q_exp_v):
-			_t_q_exp_v_l += 1
-		_t_q_exp_v_l += 1
+		_t_q_exp_v_l = Binary()
+		while TwosPow(_t_q_exp_v_l) <= _t_q_exp_v.Abs():
+			_t_q_exp_v_l += One
+		_t_q_exp_v_l += One
 		
-		_t_q_exp = ReturnableDoubleToBin(2**(_t_q_exp_v_l)-(_t_q_exp_v))
+		#Remove leading zeros for propper calculation
+		_t_q_exp = TwosPow(_t_q_exp_v_l)-_t_q_exp_v
+		while _t_q_exp.data[_t_q_exp.GetLength()-1] != True:
+			_t_q_exp.Pop(_t_q_exp.GetLength()-1)
 		
+		#Calculate _t_q_exp_l
 		_t_q_exp_l = _t_q_exp.GetLength()-1
-		for i in range(_t_q_exp_v_l-_t_q_exp_l):
-			_t_q_exp.Append(_t_q_exp_v <= 0)
+		_t_q_exp_l_bin = ReturnableDoubleToBin(_t_q_exp_l)
+		
+		#Add leading zero for propper exponent value
+		i = _t_q_exp_v_l-_t_q_exp_l_bin
+		while i > Zero:
+			_t_q_exp.Append(_t_q_exp_v < Zero)
+			i -= One
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig)
 	def __truediv__(self, other, set_precision=False):
@@ -921,57 +954,3 @@ class hpf:
 			v = "Infinity"
 		sign = "-" * (self.sign.data[0] == False)
 		return sign + str(v)
-
-def test():
-	a = hpf()
-	b = hpf()
-	tb = Binary()
-	
-	#a = 1
-	a.mant = Binary([0])
-	a.exp  = Binary([0,1])
-	a.sign = Binary([1])
-	print("a: %s, a.__repr__(): %s" % (str(a), a.__repr__()))
-	
-	#b = 10
-	b.mant = Binary([1,0])
-	b.exp  = Binary([1,0,0])
-	b.sign = Binary([1])
-	print("b: %s, b.__repr__(): %s" % (str(b), b.__repr__()))
-	
-	c = a.__truediv__(b, 50) 
-	print("c: %s, c.__repr__(): %s" % (str(c), c.__repr__()))
-	
-	c = b * c
-	print("c: %s, c.__repr__(): %s" % (str(c), c.__repr__()))
-	
-# test()
-
-def Fibonacci(iters=1001):
-	a = hpf()
-	a.exp = Binary([0,1])
-	a.sign = Binary([1])
-	
-	b = hpf()
-	b.exp = Binary([0,1])
-	b.sign = Binary([1])
-	
-	for i in range(iters):
-		if i % 2 == 0:
-			a = a + b 
-			# print(a)
-		else:
-			b = a + b
-			# print(b)
-	
-	c = a / b 
-	print(a)
-	# print(a.__repr__())
-	print(b)
-	# print(b.__repr__())
-	print(c)
-	print(c.__repr__())
-	
-	return a, b, c
-
-fa, fb, fc = Fibonacci()
