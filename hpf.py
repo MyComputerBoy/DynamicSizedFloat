@@ -129,7 +129,6 @@ class Binary:
 		return Binary(q)
 	
 	def __pure_add__(self, other, ci=False, append_ci=True):
-		# print("Binary.__pure_add__():")
 		#Clone Binary objects to new temporary variables to not mess with original objects
 		_new_self_bin = Binary(self.data, self.co, self.sign)
 		_new_other_bin = Binary(other.data, other.co, other.sign)
@@ -572,7 +571,6 @@ class hpf:
 			self.exp_length		= exp.GetLength()
 	
 	def Allign(self, other, additive=True):
-		# print("\nhpf.Allign:")
 		bin = Binary()
 		Zero = Binary([False])
 		One = Binary([True])
@@ -592,9 +590,6 @@ class hpf:
 		_self_exp_val = _self_exp-_new_self.exp
 		_other_exp_val = _other_exp-_new_other.exp
 		
-		# print("_self_exp_val:  %s" % (_self_exp_val))
-		# print("_other_exp_val: %s" % (_other_exp_val))
-		
 		#Add leading one for calculations
 		if additive:
 			_new_self.mant.Append(True)
@@ -602,7 +597,6 @@ class hpf:
 		
 		#If self represents a larger number
 		if _other_exp_val < _self_exp_val:
-			# print("Greater")
 			#Calculate amount to shift
 			shift = _self_exp_val - _other_exp_val
 			offset = _new_self.mant.GetLength() - _new_other.mant.GetLength()
@@ -615,7 +609,6 @@ class hpf:
 				_new_other.mant.LengthAppend(shift.ToInt())
 				_new_other.mant.InverseLengthAppend(offset)
 		else:	#If other represents a larger number
-			# print("Lesser")
 			#Calculate amount to shift
 			shift = _other_exp_val - _self_exp_val
 			offset = _new_self.mant.GetLength() - _new_other.mant.GetLength()
@@ -631,7 +624,6 @@ class hpf:
 		return _new_self, _new_other, reverse_shift
 	
 	def __pure_add__(self, other):
-		# print("\nhpf.__pure_add__():")
 		bin = Binary()
 		Zero = Binary([False],False,True)
 		One = Binary([True],False,True)
@@ -745,6 +737,7 @@ class hpf:
 		bin  = Binary()
 		Zero = Binary([False])
 		One  = Binary([True])
+		
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
 		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
@@ -931,13 +924,6 @@ class hpf:
 			_t_q.LengthPop(largest_one+1, -1)
 			
 			_bin_largest_one = ReturnableDoubleToBin(largest_one)
-			
-			#resized is how many bits was popped at the bottom
-			# resized = _t_q_mant_len-_t_q.GetLength()
-			# i = 0
-			# while _t_q.data[0] != True and i < resized:
-				# _t_q.Pop(0)
-				# i += 1
 		
 		#Calculate _t_q_exp
 		_t_q_exp_v_l = Binary()
@@ -1357,12 +1343,6 @@ def test():
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
-	# print("4:     %s" % (four))
-	# print("99:    %s" % (nn))
-	# print("396:   %s" % (thns))
-	# print("1103:  %s" % (eht))
-	# print("26390: %s" % (tstt))
-	
 	depth = 1000
 	
 	i = _Zero.DeepCopy()
@@ -1386,6 +1366,3 @@ def test():
 	print(pi)
 
 test()
-
-# def ramsat(iters=15, show_iters=True):
-	
