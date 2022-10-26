@@ -835,13 +835,12 @@ class hpf:
 		#Handle zero
 		if self.is_zero.data[0]:
 			if other.is_zero.data[0]:
-				hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
+				return hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
 			else:
-				self.is_zero = Binary([False])
 				return hpf(other.mant, other.exp, Binary([not other.sign.data[0]]), other.is_zero)
 		else:
 			if other.is_zero.data[0]:
-				return self
+				return hpf(self.mant, self.exp, self.sign, self.is_zero)
 		
 		return hpf(_t_q_mant, _t_q_exp, _t_q_sign, self.is_zero)
 	
@@ -1303,3 +1302,90 @@ def exp(n, iters=15, show_iters=False):
 		i += One
 	
 	return q
+
+def sqrt(n, depth=2000, iters=15, show_iters=True):
+	Two = _Two.DeepCopy()
+	q = _One.DeepCopy()
+	
+	for i in range(iters):
+		if show_iters:
+			print(q)
+		temp = n - x_to_the_y(q, Two)
+		div = Two * q
+		if depth < q.mant.GetLength()-1:
+			q += temp.__truediv__(div,depth)
+		q += temp.__truediv__(div,depth-(q.mant.GetLength()-1))
+	
+	return q
+
+def test():
+	One				= _One.DeepCopy()
+	two				= _Two.DeepCopy()
+	four			= hpf()
+	nn				= hpf()
+	thns			= hpf()
+	eht				= hpf()
+	tstt			= hpf()
+	
+	#Define four
+	four.mant		= Binary([False])
+	four.exp		= Binary([0,0])
+	four.sign		= Binary([True])
+	four.is_zero	= Binary([False])
+	
+	#Def 99
+	nn.mant			= Binary([1,1,0,0,0,1])
+	nn.exp			= Binary([0,1,0,0])
+	nn.sign			= Binary([True])
+	nn.is_zero		= Binary([False])
+	
+	#Define 396
+	thns.mant		= Binary([0,0,1,1,0,0,0,1])
+	thns.exp		= Binary([0,0,0,0])
+	thns.sign		= Binary([True])
+	thns.is_zero	= Binary([False])
+	
+	#Define 1103
+	eht.mant		= Binary([1,1,1,1,0,0,1,0,0,0])
+	eht.exp			= Binary([0,1,1,0,0])
+	eht.sign		= Binary([True])
+	eht.is_zero		= Binary([False])
+	
+	#Define 26390
+	tstt.mant		= Binary([0,1,1,0,1,0,0,0,1,1,1,0,0,1])
+	tstt.exp		= Binary([0,1,0,0,0])
+	tstt.sign		= Binary([True])
+	tstt.is_zero	= Binary([False])
+	
+	# print("4:     %s" % (four))
+	# print("99:    %s" % (nn))
+	# print("396:   %s" % (thns))
+	# print("1103:  %s" % (eht))
+	# print("26390: %s" % (tstt))
+	
+	depth = 1000
+	
+	i = _Zero.DeepCopy()
+	summated = _Zero.DeepCopy()
+	
+	for _i in range(25):
+		print(summated)
+		
+		dividend = factorial(four * i) * ((tstt * i) + eht)
+		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
+		
+		summated += dividend.__truediv__(divisor, depth)
+		
+		i += One
+	
+	trt = two * sqrt(two, depth, 25)
+	scalar = trt/x_to_the_y(nn, two)
+	
+	pi = One / (scalar * summated)
+	
+	print(pi)
+
+test()
+
+# def ramsat(iters=15, show_iters=True):
+	
