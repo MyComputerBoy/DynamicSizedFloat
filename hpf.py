@@ -128,7 +128,8 @@ class Binary:
 		
 		return Binary(q)
 	
-	def __pure_add__(self, other, ci=False):
+	def __pure_add__(self, other, ci=False, append_ci=True):
+		# print("Binary.__pure_add__():")
 		#Clone Binary objects to new temporary variables to not mess with original objects
 		_new_self_bin = Binary(self.data, self.co, self.sign)
 		_new_other_bin = Binary(other.data, other.co, other.sign)
@@ -147,7 +148,7 @@ class Binary:
 			at = xo * ci 
 			ci = m.ceil(ao/2 + at/2)
 		
-		if ci:
+		if ci and append_ci:
 			q.append(True)
 		
 		return Binary(q, ci, self.sign)
@@ -262,19 +263,19 @@ class Binary:
 		#Append appropriate lengths to appropriate object
 		if Inverse:
 			if _self_len < _max_len:
-				_new_self_bin.InverseLengthAppend(_max_len-_self_len)
+				_new_self_bin.InverseLengthAppend(_other_len-_self_len)
 			else:
-				_new_other_bin.InverseLengthAppend((_max_len-_other_len)-offset)
+				_new_other_bin.InverseLengthAppend((_self_len-_other_len)-offset)
 				_new_other_bin.LengthAppend(offset)
 			
 			return _new_self_bin, _new_other_bin
 		
 		if _self_len < _max_len:
 			if _max_len - _self_len >= 1:
-				_new_self_bin.LengthAppend(_max_len-_self_len)
+				_new_self_bin.LengthAppend(_other_len-_self_len)
 		else:
 			if _max_len - _other_len >= 1:
-				_new_other_bin.LengthAppend((_max_len-_other_len)-offset)
+				_new_other_bin.LengthAppend((_self_len-_other_len)-offset)
 				_new_other_bin.InverseLengthAppend(offset)
 		
 		return _new_self_bin, _new_other_bin
@@ -630,6 +631,7 @@ class hpf:
 		return _new_self, _new_other, reverse_shift
 	
 	def __pure_add__(self, other):
+		# print("\nhpf.__pure_add__():")
 		bin = Binary()
 		Zero = Binary([False],False,True)
 		One = Binary([True],False,True)
@@ -780,7 +782,9 @@ class hpf:
 			two_compliment = Binary([True for i in range(_t_q_mant_len)])
 			_t_q_mant = _t_q_mant.__xor__(two_compliment)
 			_t_q_mant = _t_q_mant + One
-			_new_self.sign = Binary([False])
+			_t_q_sign = Binary([False])
+		else:
+			_t_q_sign = Binary([True])
 		
 		#Find leading one
 		largest_one = -1
@@ -839,7 +843,7 @@ class hpf:
 			if other.is_zero.data[0]:
 				return self
 		
-		return hpf(_t_q_mant, _t_q_exp, _new_self.sign, self.is_zero)
+		return hpf(_t_q_mant, _t_q_exp, _t_q_sign, self.is_zero)
 	
 	def __add__(self, other):
 		if self.sign.data[0]:
@@ -847,10 +851,8 @@ class hpf:
 				return self.__pure_add__(other)
 			return self.__pure_sub__(other)
 		if other.sign.data[0]:
-			return self.__pure_sub__(other)
-		_t_q = self.__pure_add__(other)
-		_t_q.sign.data[0] = False
-		return _t_q
+			return other.__pure_sub__(self)
+		return self.__pure_add__(other)
 	def __sub__(self, other):
 		if self.sign.data[0]:
 			if other.sign.data[0]:
@@ -903,14 +905,13 @@ class hpf:
 		
 		#Calculate multiplication of mantissa
 		co_offset = 0
-		for i in range(len(_new_self.mant.data)-1, -1, -1):
+		for i in range(_new_self.mant.GetLength()-1, -1, -1):
 			if _new_self.mant.data[i]:
-				_t_q_mant, _t_other = _t_q.Allign(_new_other.mant, True, (_new_self.mant.GetLength()+co_offset)-(i+1))
-				_t_q = _t_q_mant + _t_other
+				_t_q_mant, _t_other = _t_q.Allign(_new_other.mant, True, (_new_self.mant.GetLength()-1)-(i-co_offset))
+				_t_q = _t_q_mant.__pure_add__(_t_other)
 				if _t_q.co:
 					co_offset += 1
 					_t_q_exp_v += One
-					_t_q.Append(True)
 		
 		#Calculate _t_q sign
 		_t_q_sig = Binary([self.sign.data[0] and other.sign.data[0]])
@@ -930,14 +931,14 @@ class hpf:
 			#Shift is how many bits was popped at the top
 			_t_q.LengthPop(largest_one+1, -1)
 			
-			# _bin_largest_one = ReturnableDoubleToBin(largest_one)
+			_bin_largest_one = ReturnableDoubleToBin(largest_one)
 			
 			#resized is how many bits was popped at the bottom
-			resized = _t_q_mant_len-_t_q.GetLength()
-			i = 0
-			while _t_q.data[0] != True and i < resized:
-				_t_q.Pop(0)
-				i += 1
+			# resized = _t_q_mant_len-_t_q.GetLength()
+			# i = 0
+			# while _t_q.data[0] != True and i < resized:
+				# _t_q.Pop(0)
+				# i += 1
 		
 		#Calculate _t_q_exp
 		_t_q_exp_v_l = Binary()
@@ -1083,6 +1084,7 @@ class hpf:
 		
 		return True
 	def __lt__(self, other):
+		Zero = Binary([False], False, True)
 	
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
@@ -1105,13 +1107,13 @@ class hpf:
 		#Zero out exp values for length and value calculations
 		_self_exp_l_bin = od.exp.__xor__(od.exp)
 		
-		#Add leading ones back in within the size of the exponents
-		# _self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
+		# Add leading ones back in within the size of the exponents
+		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
 		
-		#Calculate actual values of exponents
+		# Calculate actual values of exponents
 		_new_self_exp_v  = _self_exp_l_bin-od.exp
 		
-		if od.exp.data[od.exp.GetLength()-1]:
+		if _new_self_exp_v >= Zero:
 			return False
 		
 		return True
@@ -1245,8 +1247,9 @@ def factorial(n: hpf):
 def x_to_the_y(x, y):
 	One = _One.DeepCopy()
 	i = _One.DeepCopy()
-	q = x.DeepCopy()
-	while i.Abs() < y.Abs():
+	q = One.DeepCopy()
+	_max = y.DeepCopy() + One
+	while i.Abs() < _max.Abs():
 		q *= x
 		i += One
 	return q
@@ -1254,9 +1257,11 @@ def x_to_the_y(x, y):
 def _exp_temp(n):
 	One = _One.DeepCopy()
 	Two = _Two.DeepCopy()
-	return Two * n + One
+	q = Two * n
+	q = q + One
+	return q
 
-def sin(n, iters=50, show_iters=True):
+def sin(n, iters=15, show_iters=False):
 	#Boring setup
 	q = _Zero.DeepCopy()
 	i = _Zero.DeepCopy()
@@ -1265,29 +1270,36 @@ def sin(n, iters=50, show_iters=True):
 	#Actual computation
 	for _i in range(iters):
 		if show_iters:
-			print("\ni: %s, q: %s" % (_i, q))
+			print("i: %s, q: %s" % (_i, q))
+		
 		_temp = _exp_temp(i)
 		_exp_divisor = x_to_the_y(n, _temp)
 		_fac_dividend = factorial(_temp)
-		_exp_divided = _exp_divisor.__truediv__(_fac_dividend, _exp_divisor.mant.GetLength()+_fac_dividend.mant.GetLength()+100)
+		_exp_divided = _exp_divisor.__truediv__(_fac_dividend, _exp_divisor.mant.GetLength()+_fac_dividend.mant.GetLength()+(15*(iters-_i)))
+		
 		if _i % 2 == 0:
 			q = q + _exp_divided
 		else:
 			q = q - _exp_divided
 		i += One
+	
 	return q
 
-def test():
-	a = hpf()
+def exp(n, iters=15, show_iters=False):
+	#Boring setup
+	q = _Zero.DeepCopy()
+	i = _Zero.DeepCopy()
+	One = _One.DeepCopy()
 	
-	a.mant		= Binary([0])
-	a.exp		= Binary([1])
-	a.sign		= Binary([True])
-	a.is_zero	= Binary([False])
+	for _i in range(iters):
+		if show_iters:
+			print("i: %s, q: %s" % (_i, q))
+		
+		_exp_divisor = x_to_the_y(n, i)
+		_fac_dividend = factorial(i)
+		_exp_divided = _exp_divisor.__truediv__(_fac_dividend, _exp_divisor.mant.GetLength()+_fac_dividend.mant.GetLength()+(15*(iters-_i)))
+		
+		q += _exp_divided
+		i += One
 	
-	tf = sin(a)
-	
-	print("sin(%s) = %s" % (a, tf))
-	print(tf.__repr__())
-
-test()
+	return q
