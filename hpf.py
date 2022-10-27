@@ -28,7 +28,7 @@ __str__(self) -> string  representation override for Binary
 
 For hpf:
 
-__init__(self, mantissa=None, exp=None, sign=None) -> Initialization with optional initialization
+__init__(self, mantissa=None, exp=None, sign=None) -> initialization with optional initialization
 Allign(self, other, additive=True) -> function to allign mantissa based on actual value with respect to exponent, additive for alligning for floating point arithmetic
 __pure_add__(self, other) -> primitive function for add hpf
 __pure_sub__(self, other) -> primitive function for sub hpf
@@ -36,17 +36,67 @@ __add__(self, other) -> full propper function to add arbitrary hpf
 __sub__(self, other) -> full propper function to sub arbitrary hpf
 __mul__(self, other) -> function for multiplication
 __truediv__(self, other) -> function for division
+__eq__(self, other) -> equals overload
+__lt__(self, other) -> less than overload
+__le__(self, other) -> less than or equals overload
+__gt__(self, other) -> greater than overload
+__ge__(self, other) -> greater than or equals overload
+__ne__(self, other) -> not equals overload
+DeepCopy(self) -> clone hpf with absolutely no ccopy of old object for no reference in any ways
+ToFloat(self) -> Converts to float
+Abs(self) -> Absolute function, for omitting the sign for positive
 __repr__(self) -> representation override for hpf
 __str__(self) -> string representation override for hpf
+
+For __name__:
+
+factorial(n) -> factorial of hpf n
+x_to_the_y(x, y) -> x to the power of y or x**y
+sin(n, iters=15, depth=1000, show_iters=False) -> sin in rads
+exp(n, iters=15, show_iters=False) -> the exponential function
+sqrt(n, depth=2000, iters=15, show_iters=True) -> square root of n
+pi(depth=10000, iters=10) -> The Ramanujan-Sato approximation of pi
 """
 from dataclasses import dataclass
+import os
 import math as m 
+
+#Set terminal colour to green (To look like it's from the Matrix)
+os.system('color 2')
 
 class CustomException(Exception):
 	pass
 
 @dataclass
 class Binary:
+	"""Class Binary: Proprietary format for arbitrarily large signed binary numbers
+	Main user functions:
+	
+	__add__(self, other) -> add overload
+	__sub__(self, other) -> sub overload
+	Append(self, value) -> appends value to self.data
+	Pop(self, index=0) -> pops self.data[index]
+	LengthPop(self, value=1, index=0) -> pops value lengths of self.data[index]
+	InverseAppend(self, value=False) -> self.data.insert(0, value)
+	InverseLengthAppend(self, length=1, fill=False) -> InverseAppend(fill) length times
+	ToInt(self) -> Converts to int
+	LimitedToInt(self) -> Converts to Int without 'Infinity' problem
+	DoubleToBin(self, a, precision=0) -> converts double to Binary with precision precision
+	GetLength(self) -> Gets data length
+	__eq__(self, other) -> equals comparison
+	__gt__(self, other) -> greater than comparison
+	__ge__(self, other) -> greater or equals comparison
+	__lt__(self, other) -> less than comparison
+	__le__(self, other) -> less or equals comparison
+	__ne__(self, other) -> not equals comparison
+	Abs(self) -> Absolute function, for omitting the sign for positive
+	
+	Main structure:
+	Binary initializes to data=[0 for i in range(24)], co=False, sign=False
+	data -> main data as mantissa
+	co -> carry out flag
+	sign -> sign flag, true is positive, false is negative
+	"""
 	def __init__(self, data=None, co=None, sign=None):
 		if type(data) == type(None):
 			#Initialize data for 8 bits, co and sign
@@ -546,6 +596,33 @@ def TwosPow(n):
 
 @dataclass
 class hpf:
+	"""Class hpf -> Proprietary format for arbitrarily high precision floating point numbers
+	Main user functions:
+	
+	__add__(self, other) -> add overload
+	__sub__(self, other) -> sub overload
+	__mul__(self, other, set_precision=False) -> mul overload with optional predefined precision
+	__truediv__(self, other, set_precision=False, preemptive_offset=None) -> truediv overload with optional predefined precision and optional exponent offset
+	__eq__(self, other) -> equals overload
+	__lt__(self, other) -> less than overload
+	__le__(self, other) -> less than or equals overload
+	__gt__(self, other) -> greater than overload
+	__ge__(self, other) -> greater than or equals overload
+	__ne__(self, other) -> not equals overload
+	DeepCopy(self) -> clone hpf with absolutely no ccopy of old object for no reference in any ways
+	ToFloat(self) -> Converts to float
+	Abs(self) -> Absolute function, for omitting the sign for positive
+	__repr__(self) -> representation override for hpf
+	__str__(self) -> string representation override for hpf
+	
+	Main structure:
+	hpf initializes to mantissa=Binary([0 for i in range(24)]), exp=Binary([0 for i in range(8)]), sign=Binary([1]), is_integer=Binary([0])
+	mantissa -> main data or mantissa
+	exp -> exponent, is defined as (2**(exp.GetLength()-1))-exp, meaning in a positive Binary it' possible to define positive and negative values 
+	sign -> sign
+	is_zero -> is is_integer is true it's zero
+	
+	"""
 	def __init__(self, mantissa=None, exp=None, sign=None, is_zero=None):
 		if type(mantissa) == type(None):
 			#Initialize mantissa for 24 bits, exponent for 8 bits and sign for 1 bit
@@ -553,7 +630,7 @@ class hpf:
 			__expo_len__ = 8
 			self.mant	 = Binary([False for i in range(__mant_len__)])
 			self.exp	 = Binary([False for i in range(__expo_len__)])
-			self.sign	 = Binary([False])
+			self.sign	 = Binary([True])
 			self.is_zero = Binary([False])
 			
 			self.mant_length = __mant_len__
@@ -722,7 +799,7 @@ class hpf:
 			_t_q_exp.Append(_t_q_exp_v < Zero)
 			i += One
 		
-		#Handle zero
+		#Handle zeros
 		if self.is_zero.data[0]:
 			if other.is_zero.data[0]:
 				return hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
@@ -825,7 +902,7 @@ class hpf:
 			_t_q_exp.Append(_t_q_exp_v <= Zero)
 			i -= One
 		
-		#Handle zero
+		#Handle zeros
 		if self.is_zero.data[0]:
 			if other.is_zero.data[0]:
 				return hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
@@ -863,6 +940,7 @@ class hpf:
 		Zero = Binary([False])
 		One = Binary([True])
 		
+		#Handle zeros
 		if self.is_zero.data[0] or other.is_zero.data[0]:
 			return hpf(Binary([False]), Binary([True]), Binary([True]), Binary([True]))
 		
@@ -947,10 +1025,12 @@ class hpf:
 			i -= One
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
-	def __truediv__(self, other, set_precision=False):
+	def __truediv__(self, other, set_precision=False, preemptive_offset=None):
 		bin = Binary()
 		One = Binary([True])
 		Zero = Binary([False])
+		
+		#Handle zeros
 		if self.is_zero.data[0]:
 			return hpf(Binary([False]), Binary([True]), Binary([True]), Binary([True]))
 		if other.is_zero.data[0]:
@@ -1016,6 +1096,9 @@ class hpf:
 			
 			_bin_largest_one = ReturnableDoubleToBin(largest_one)
 			_t_q_exp_v -= _bin_largest_one
+		
+		if type(preemptive_offset) != type(None):
+			_t_q_exp_v += preemptive_offset
 		
 		#Calculate _t_q_exp
 		_t_q_exp_v_l = Binary()
@@ -1215,6 +1298,7 @@ class hpf:
 		sign = "-" * (self.sign.data[0] == False)
 		return sign + str(v)
 
+#Define 0, 1 and 2
 _Zero = hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
 _One = hpf(Binary([False]), Binary([True]), Binary([True]), Binary([False]))
 _Two = hpf(Binary([False]), Binary([False]), Binary([True]), Binary([False]))
@@ -1246,7 +1330,7 @@ def _exp_temp(n):
 	q = q + One
 	return q
 
-def sin(n, iters=15, show_iters=False):
+def sin(n, iters=15, depth=1000, show_iters=False):
 	#Boring setup
 	q = _Zero.DeepCopy()
 	i = _Zero.DeepCopy()
@@ -1260,7 +1344,7 @@ def sin(n, iters=15, show_iters=False):
 		_temp = _exp_temp(i)
 		_exp_divisor = x_to_the_y(n, _temp)
 		_fac_dividend = factorial(_temp)
-		_exp_divided = _exp_divisor.__truediv__(_fac_dividend, _exp_divisor.mant.GetLength()+_fac_dividend.mant.GetLength()+(15*(iters-_i)))
+		_exp_divided = _exp_divisor.__truediv__(_fac_dividend, depth)
 		
 		if _i % 2 == 0:
 			q = q + _exp_divided
@@ -1289,22 +1373,57 @@ def exp(n, iters=15, show_iters=False):
 	
 	return q
 
+def OffsetExponentValue(x, offset):
+	Zero = Binary([False])
+	One = Binary([True])
+	
+	_n_x = x.DeepCopy()
+	
+	_n_e_b = _n_x.exp.__xor__(_n_x.exp)
+	_n_e_b.data[_n_e_b.GetLength()-1] = True
+	
+	_n_e_v = _n_e_b-_n_x.exp
+	
+	_n_e_v += offset
+	
+	#Calculate _t_q_exp
+	_t_q_exp_v_l = Binary()
+	while TwosPow(_t_q_exp_v_l) < _n_e_v.Abs():
+		_t_q_exp_v_l += One
+	_t_q_exp_v_l += One
+	
+	#Remove leading zeros for propper calculation
+	_t_q_exp = TwosPow(_t_q_exp_v_l)-_n_e_v
+	while _t_q_exp.data[_t_q_exp.GetLength()-1] != True and _t_q_exp.GetLength() > 1:
+		_t_q_exp.Pop(_t_q_exp.GetLength()-1)
+	
+	#Calculate _t_q_exp_l
+	_t_q_exp_l = Binary()
+	_t_q_exp_l.DoubleToBin(_t_q_exp.GetLength()-1)
+	
+	#Add leading zero for propper exponent value
+	i = _t_q_exp_v_l-_t_q_exp_l
+	while i > Zero:
+		_t_q_exp.Append(_n_e_v < Zero)
+		i -= One
+	
+	return hpf(x.mant, _t_q_exp, x.sign, x.is_zero)
+
 def sqrt(n, depth=2000, iters=15, show_iters=True):
+	NegOne = Binary([True], False, False)
 	Two = _Two.DeepCopy()
 	q = _One.DeepCopy()
 	
 	for i in range(iters):
 		if show_iters:
-			print(q)
-		temp = n - x_to_the_y(q, Two)
-		div = Two * q
-		if depth < q.mant.GetLength()-1:
-			q += temp.__truediv__(div,depth)
-		q += temp.__truediv__(div,depth-(q.mant.GetLength()-1))
+			print("i: %s" % (i))
+			print(q.__repr__())
+		temp = q + n.__truediv__(q, depth)
+		q = OffsetExponentValue(temp, NegOne)
 	
 	return q
 
-def test():
+def pi(depth=10000, iters=10):
 	One				= _One.DeepCopy()
 	two				= _Two.DeepCopy()
 	four			= hpf()
@@ -1343,13 +1462,15 @@ def test():
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
-	depth = 1000
+	trt = two * sqrt(two, depth, iters)
+	scalar = trt/x_to_the_y(nn, two)
 	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
 	
-	for _i in range(25):
-		print(summated)
+	for _i in range(iters):
+		print("i: %s" % (i))
+		print(summated.__repr__())
 		
 		dividend = factorial(four * i) * ((tstt * i) + eht)
 		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
@@ -1358,11 +1479,7 @@ def test():
 		
 		i += One
 	
-	trt = two * sqrt(two, depth, 25)
-	scalar = trt/x_to_the_y(nn, two)
+	pi = One.__truediv__(scalar * summated, depth)
 	
-	pi = One / (scalar * summated)
-	
-	print(pi)
+	return pi
 
-test()
