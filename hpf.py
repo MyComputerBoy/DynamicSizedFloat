@@ -1,12 +1,9 @@
 """hpf.py -> proprietary high precision floating point format
 Main classes:
-
 Binary -> dynamically sized binary format
 hpf -> proprietary high precision float with arbitrarily high precision floating point format
-
 Main user functions:
 For Binary:
-
 __init__(self, data=None, co=None, sign=None) -> Initialization with optional initialization
 __add__(self, other) -> add override
 __sub__(self, other) -> sub override
@@ -25,9 +22,7 @@ __ne__(self, other) -> not equals comparison
 Abs(self) -> Absolute function, for omitting the sign for positive
 __repr__(self) -> representation override for Binary class
 __str__(self) -> string  representation override for Binary
-
 For hpf:
-
 __init__(self, mantissa=None, exp=None, sign=None) -> initialization with optional initialization
 Allign(self, other, additive=True) -> function to allign mantissa based on actual value with respect to exponent, additive for alligning for floating point arithmetic
 __pure_add__(self, other) -> primitive function for add hpf
@@ -47,9 +42,7 @@ ToFloat(self) -> Converts to float
 Abs(self) -> Absolute function, for omitting the sign for positive
 __repr__(self) -> representation override for hpf
 __str__(self) -> string representation override for hpf
-
 For __name__:
-
 factorial(n) -> factorial of hpf n
 x_to_the_y(x, y) -> x to the power of y or x**y
 sin(n, iters=15, depth=1000, show_iters=False) -> sin in rads
@@ -59,6 +52,7 @@ pi(depth=10000, iters=10) -> The Ramanujan-Sato approximation of pi
 """
 from dataclasses import dataclass
 import os
+from time import time
 import math as m 
 
 #Set terminal colour to green (To look like it's from the Matrix)
@@ -191,11 +185,9 @@ class Binary:
 		
 		#Calculate addition
 		for i, e in enumerate(_new_self_bin.data):
-			xo = (_new_self_bin.data[i] + _new_other_bin.data[i]) % 2
-			ao = _new_self_bin.data[i] * _new_other_bin.data[i]
-			q[i] = (xo + ci) % 2
-			at = xo * ci 
-			ci = m.ceil(ao/2 + at/2)
+			t = _new_self_bin.data[i] + _new_other_bin.data[i] + ci
+			q[i] = t % 2
+			ci = (t - (t % 2))/2
 		
 		if ci and append_ci:
 			q.append(True)
@@ -214,11 +206,9 @@ class Binary:
 		
 		#Calculate subtraction
 		for i, e in enumerate(_new_self_bin.data):
-			xo = (_new_self_bin.data[i] + (1-_new_other_bin.data[i])) % 2
-			ao = _new_self_bin.data[i] * (1-_new_other_bin.data[i])
-			q[i] = (xo + ci) % 2
-			at = xo * ci 
-			ci = m.ceil(ao/2 + at/2)
+			t = _new_self_bin.data[i] + (not _new_other_bin.data[i]) + ci
+			q[i] = t % 2
+			ci = (t - (t % 2))/2
 		
 		if using_twos_compliment:
 			if ci == True:
@@ -700,7 +690,7 @@ class hpf:
 		
 		return _new_self, _new_other, reverse_shift
 	
-	def __pure_add__(self, other):
+	def __pure_add__(self, other, preemptive_offset=False, set_precision=False):
 		bin = Binary()
 		Zero = Binary([False],False,True)
 		One = Binary([True],False,True)
@@ -728,6 +718,9 @@ class hpf:
 		else:
 			_t_q_exp_v = _new_other_exp_v
 		
+		if type(preemptive_offset) != type(False):
+			_t_q_exp_v += preemptive_offset
+		
 		#Get lengths of mantissa
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
@@ -738,13 +731,14 @@ class hpf:
 		#Get longest mantissa length based on reverse_shift
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
-		if reverse_shift:	
-			_o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
-		else:
-			_o_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len < _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len >= _new_other_mant_len)
 		
 		#Add mantissa
 		_t_q_mant = _new_self.mant.__float_add__(_new_other.mant)
+		if type(set_precision) != type(False):
+			t = (_t_q_mant.GetLength()-1-_new_self_exp_v.ToInt()) - set_precision
+			if t > 0:
+				_t_q_mant.LengthPop(t)
+				_new_self.mant.LengthPop(t)
 		
 		one = Binary([True])
 		#Handle carry out
@@ -810,7 +804,7 @@ class hpf:
 				return self
 		
 		return hpf(_t_q_mant, _t_q_exp, self.sign, self.is_zero)
-	def __pure_sub__(self, other):
+	def __pure_sub__(self, other, preemptive_offset=False, set_precision=False):
 		bin  = Binary()
 		Zero = Binary([False])
 		One  = Binary([True])
@@ -834,8 +828,16 @@ class hpf:
 		else:
 			_t_q_exp_v = _other_exp_val
 		
+		if type(preemptive_offset) != type(False):
+			_t_q_exp_v += preemptive_offset
+		
 		#Allign mantissa
 		_new_self, _new_other, reverse_shift = _new_self.Allign(_new_other)
+		if type(set_precision) != type(False):
+			t = (_t_q_mant.GetLength()-1-_new_self_exp_v.ToInt()) - set_precision
+			if t > 0:
+				_t_q_mant.LengthPop(t)
+				_new_self.mant.LengthPop(t)
 		
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
@@ -914,24 +916,24 @@ class hpf:
 		
 		return hpf(_t_q_mant, _t_q_exp, _t_q_sign, self.is_zero)
 	
-	def __add__(self, other):
+	def __add__(self, other, preemptive_offset=False, set_precision=False):
 		if self.sign.data[0]:
 			if other.sign.data[0]:
-				return self.__pure_add__(other)
-			return self.__pure_sub__(other)
+				return self.__pure_add__(other, preemptive_offset, set_precision)
+			return self.__pure_sub__(other, preemptive_offset, set_precision)
 		if other.sign.data[0]:
-			return other.__pure_sub__(self)
-		return self.__pure_add__(other)
-	def __sub__(self, other):
+			return other.__pure_sub__(self, preemptive_offset, set_precision)
+		return self.__pure_add__(other, preemptive_offset, set_precision)
+	def __sub__(self, other, preemptive_offset=False, set_precision=False):
 		if self.sign.data[0]:
 			if other.sign.data[0]:
-				return self.__pure_sub__(other)
-			return self.__pure_add__(other)
+				return self.__pure_sub__(other, preemptive_offset, set_precision)
+			return self.__pure_add__(other, preemptive_offset, set_precision)
 		if other.sign.data[0]:
-			_t_q = self.__pure_add__(other)
+			_t_q = self.__pure_add__(other, preemptive_offset, set_precision)
 			_t_q.sign.data[0] = False
 			return _t_q
-		_t_q = self.__pure_sub__(other)
+		_t_q = self.__pure_sub__(other, preemptive_offset, set_precision)
 		_t_q.sign.data[0] = not _t_q.sign.data[0]
 		return _t_q
 	
@@ -952,9 +954,6 @@ class hpf:
 		_new_self.mant.Append(True)
 		_new_other.mant.Append(True)
 		
-		#Make _t_q object for computation
-		_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()
-		_t_q = Binary([False for i in range(_t_q_mant_len)])
 		
 		#Calculate exponent values
 		#Zero out exp values for length and value calculations
@@ -973,15 +972,22 @@ class hpf:
 		if _t_q_exp_v.co:
 			_t_q_exp_v.Append(True)
 		
+		#Make _t_q object for computation
+		_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()
+		_t_q = Binary([False for i in range(_t_q_mant_len)])
+		
 		#Calculate multiplication of mantissa
 		co_offset = 0
+		_t_q, _t_other = _t_q.Allign(_new_other.mant, True)
+		
 		for i in range(_new_self.mant.GetLength()-1, -1, -1):
 			if _new_self.mant.data[i]:
-				_t_q_mant, _t_other = _t_q.Allign(_new_other.mant, True, (_new_self.mant.GetLength()-1)-(i-co_offset))
-				_t_q = _t_q_mant.__pure_add__(_t_other)
+				_t_q += _t_other
 				if _t_q.co:
-					co_offset += 1
 					_t_q_exp_v += One
+					_t_other.Append(False)
+			_t_other.Pop()
+			_t_other.Append(False)
 		
 		#Calculate _t_q sign
 		_t_q_sig = Binary([self.sign.data[0] and other.sign.data[0]])
@@ -1065,22 +1071,27 @@ class hpf:
 		if type(set_precision) != type(False):
 			_t_q_mant_len = set_precision
 		else:
-			_t_q_mant_len = 2 * _new_self.mant.GetLength()
+			_t_q_mant_len = 2 * _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
 		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		
 		#Calculate actual division
-		offs = 0
 		_max = _t_q_mant.GetLength()-1
+		_t_self_mant = _new_self.mant
+		_t_other_mant = _new_other.mant
 		for i in range(_max):
-			_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, offs)
-			offs += 1
+			# print(i)
 			_t_sub_res = _t_self_mant - _t_other_mant
 			
 			#If subtraction is positive
 			if _t_sub_res.sign:
-				offs = 1
 				_t_q_mant.data[_max-i] = True
 				_new_self.mant = _t_sub_res
+				
+				_t_self_mant = _new_self.mant
+				_t_other_mant = _new_other.mant
+				
+			_t_self_mant.InverseAppend(False)
+			_t_other_mant.Append(False)
 		
 		#Find leading one
 		largest_one = -1
@@ -1313,20 +1324,45 @@ def factorial(n: hpf):
 		i += One
 	return q
 
+xtyc = dict()
+
 def x_to_the_y(x, y):
 	One = _One.DeepCopy()
+	
+	global xtyc
+	
+	if str(x.ToFloat()) in xtyc:
+		if str(y.ToFloat()) in xtyc[str(x.ToFloat())]:
+			return xtyc[str(x.ToFloat())][str(y.ToFloat())][0]
+		largest = list(xtyc[str(x.ToFloat())].keys())[-1]
+		if int(largest[0]) < y.ToFloat():
+			q = xtyc[str(x.ToFloat())][largest][0]
+			i = xtyc[str(x.ToFloat())][largest][1]
+			_max = y.DeepCopy() + One
+			while i < _max:
+				q *= x
+				i += One
+			xtyc[str(x.ToFloat())] = dict()
+			xtyc[str(x.ToFloat())][str(y.ToFloat())] = [q,i]
+			return q
+	
 	i = _One.DeepCopy()
 	q = One.DeepCopy()
 	_max = y.DeepCopy() + One
 	while i.Abs() < _max.Abs():
 		q *= x
 		i += One
+	
+	if str(x) not in xtyc:
+		xtyc[str(x.ToFloat())] = dict()
+		xtyc[str(x.ToFloat())][str(y.ToFloat())] = [q,i]
 	return q
 
 def _exp_temp(n):
+	print("_exp_temp:")
 	One = _One.DeepCopy()
 	Two = _Two.DeepCopy()
-	q = Two * n
+	q = OffsetExponentValue(Two, Binary([True]))
 	q = q + One
 	return q
 
@@ -1415,15 +1451,24 @@ def sqrt(n, depth=2000, iters=15, show_iters=True):
 	q = _One.DeepCopy()
 	
 	for i in range(iters):
-		if show_iters:
-			print("i: %s" % (i))
-			print(q.__repr__())
-		temp = q + n.__truediv__(q, depth)
-		q = OffsetExponentValue(temp, NegOne)
+		start = time()
+		if show_iters == True:
+			if show_in_percentage:
+				if len(str(i)) < len(str(iters)):
+					_i_s = "0" * (len(str(iters))-len(str(i))) + str(i)
+				else:
+					_i_s = str(i)
+				print("i: %s/%s, %s%%" % (_i_s, iters-1, 100*_i/iters))
+			else:
+				print("i: %s, %s, %s" % (str(i), q, q.__repr__()))
+		q = q.__add__(n / q, NegOne)
+		nt = time()
+		print("dt: %s" % (nt-start))
 	
 	return q
 
-def pi(depth=10000, iters=10):
+def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
+	global xtyc
 	One				= _One.DeepCopy()
 	two				= _Two.DeepCopy()
 	four			= hpf()
@@ -1462,24 +1507,46 @@ def pi(depth=10000, iters=10):
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
-	trt = two * sqrt(two, depth, iters)
-	scalar = trt/x_to_the_y(nn, two)
-	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
 	
+	#Main Ramanujan-Sato body
+	print("\nMain Ramanujan-Sato body:")
+	
 	for _i in range(iters):
-		print("i: %s" % (i))
-		print(summated.__repr__())
+		start = time()
+		if show_iters:
+			if show_in_percentage:
+				if len(str(_i)) < len(str(iters)):
+					_i_s = "0" * (len(str(iters))-len(str(_i))) + str(_i)
+				else:
+					_i_s = str(i)
+				print("i: %s/%s, %s%%" % (_i_s, iters-1, 100*_i/iters))
+				print("q: %s, %s" % (summated, summated.__repr__()))
+			else:
+				print("i: %s, %s, %s" % (_i, str(summated), summated.__repr__()))
 		
 		dividend = factorial(four * i) * ((tstt * i) + eht)
 		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
 		
-		summated += dividend.__truediv__(divisor, depth)
+		summated = summated.__add__(dividend.__truediv__(divisor, depth), False)
 		
 		i += One
+		
+		nt = time()
+		print("dt: %s" % (nt-start))
+	
+	#Scalar
+	print("\nScalar")
+	
+	trt = two * sqrt(two, depth, iters, show_iters, show_in_percentage)
+	scalar = trt/x_to_the_y(nn, two)
 	
 	pi = One.__truediv__(scalar * summated, depth)
 	
+	print(pi)
+	print(pi.__repr__())
+	
 	return pi
 
+hpf_pi = pi(33300, 25)
