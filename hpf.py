@@ -1072,6 +1072,8 @@ class hpf:
 		One = Binary([True])
 		Zero = Binary([False])
 		
+		remainders = dict()
+		
 		#Handle zeros
 		if self.is_zero.data[0]:
 			return hpf(Binary([False]), Binary([True]), Binary([True]), Binary([True]))
@@ -1102,8 +1104,11 @@ class hpf:
 		
 		t = _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
 		if t > set_precision:
-			_new_self.mant.LengthPop(t)
-			_new_other.mant.LengthPop(t)
+			try:
+				_new_self.mant.LengthPop(t)
+				_new_other.mant.LengthPop(t)
+			except IndexError:
+				pass
 		
 		# #Allign mantissas
 		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
@@ -1131,16 +1136,30 @@ class hpf:
 		_t_self_mant = _new_self.mant
 		_t_other_mant = _new_other.mant
 		for i in range(_max):
-			# print(i)
 			_t_sub_res = _t_self_mant.__pure_sub__(_t_other_mant, True, False, False)
 			
 			#If subtraction is positive
 			if _t_sub_res.co == True:
-				_t_q_mant.data[_max-i] = True
-				_new_self.mant = _t_sub_res
-				
-				_t_self_mant = _new_self.mant
-				_t_other_mant = _new_other.mant
+				if str(_t_sub_res) in remainders:
+					try:
+						__max = _max-i
+						for j in range(__max):
+							_t_q_mant.data[__max-j] = remainders[str(_t_sub_res)][(__max-j) % (len(remainders[str(_t_sub_res)]))]
+						break
+					except ZeroDivisionError:
+						break
+				else:
+					_t_q_mant.data[_max-i] = True
+					_new_self.mant = _t_sub_res
+					
+					_t_self_mant = _new_self.mant
+					_t_other_mant = _new_other.mant
+					remainders[str(_t_sub_res)] = []
+			try:
+				for key in remainders:
+					remainders[key].insert(0, _t_sub_res.co)
+			except:
+				pass
 				
 			_t_self_mant.InverseAppend(False)
 			_t_other_mant.Append(False)
@@ -1610,4 +1629,28 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 	
 	return pi
 
-hpf_pi = pi(33300, 25)
+hpf_pi = pi(1000, 50)
+
+def test():
+	a = hpf()
+	b = hpf()
+	
+	a.mant		= Binary([1,0])
+	a.exp		= Binary([1,0,0])
+	a.sign		= Binary([True])
+	a.is_zero	= Binary([False])
+	
+	b.mant		= Binary([1])
+	b.exp		= Binary([1,0])
+	b.sign		= Binary([True])
+	b.is_zero	= Binary([False])
+	
+	print(a)
+	print(b)
+	
+	c = a.__truediv__(b, 100)
+	
+	print(c)
+	print(c.__repr__())
+
+# test()
