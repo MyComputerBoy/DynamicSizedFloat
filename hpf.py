@@ -257,59 +257,66 @@ class Binary:
 		_t_q.sign = not _t_q.sign
 		return _t_q
 	
-	def __float_add__(self, other, ci=False):
-		#Clone Binary objects to new temporary variables to not mess with original objects
-		_new_self_bin = Binary(self.data)
-		_new_other_bin = Binary(other.data)
+	def __float_add__(self, other, ci=False, propper_clean=True):
+		if propper_clean:
+			#Clone Binary objects to new temporary variables to not mess with original objects
+			_new_self_bin = Binary(self.data)
+			_new_other_bin = Binary(other.data)
+		else:
+			_new_self_bin = self 
+			_new_other_bin = other
 		
 		#Allign sizes for compatible addition
-		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin, True)
+		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin, True, False)
 		
 		#Create output list
 		q = [False for i in range(_new_self_bin.GetLength())]
 		
 		#Calculate addition
 		for i, e in enumerate(_new_self_bin.data):
-			xo = (_new_self_bin.data[i] + _new_other_bin.data[i]) % 2
-			ao = _new_self_bin.data[i] * _new_other_bin.data[i]
-			q[i] = (xo + ci) % 2
-			at = xo * ci 
-			ci = m.ceil(ao/2 + at/2)
+			t = _new_self_bin.data[i] + _new_other_bin.data[i] + ci
+			q[i] = t % 2
+			ci = (t - (t % 2))/2
 		return Binary(q, ci)
-	def __float_sub__(self, other, ci=True):
-		#Clone Binary objects to new temporary variables to not mess with original objects
-		_new_self_bin = Binary(self.data)
-		_new_other_bin = Binary(other.data)
+	def __float_sub__(self, other, ci=True, propper_clean=True):
+		if propper_clean:
+			#Clone Binary objects to new temporary variables to not mess with original objects
+			_new_self_bin = Binary(self.data)
+			_new_other_bin = Binary(other.data)
+		else:
+			_new_self_bin = self 
+			_new_other_bin = other
 		
 		#Allign sizes for compatible addition
-		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin, True)
+		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin, True, False)
 		
 		#Create output list
 		q = [False for i in range(_new_self_bin.GetLength())]
 		
 		#Calculate subtraction
 		for i, e in enumerate(_new_self_bin.data):
-			xo = (_new_self_bin.data[i] + (1-_new_other_bin.data[i])) % 2
-			ao = _new_self_bin.data[i] * (1-_new_other_bin.data[i])
-			q[i] = (xo + ci) % 2
-			at = xo * ci 
-			ci = m.ceil(ao/2 + at/2)
+			t = _new_self_bin.data[i] + (1-_new_other_bin.data[i]) + ci
+			q[i] = t % 2
+			ci = (t - (t % 2))/2
 		return Binary(q, ci)
 	
-	def Allign(self, other, Inverse=False, offset=0):
-		#Clone Binary objects to new temporary variables to not mess with original objects
-		_new_self_bin = Binary(self.data)
-		_new_other_bin = Binary(other.data)
+	def Allign(self, other, Inverse=False, offset=0, propper_clean=True):
+		if propper_clean:
+			#Clone Binary objects to new temporary variables to not mess with original objects
+			_new_self_bin = Binary(self.data)
+			_new_other_bin = Binary(other.data)
+			
+		else:
+			_new_self_bin = self
+			_new_other_bin = other
 		
 		#Get lengths
 		_self_len = _new_self_bin.GetLength()
 		_other_len = _new_other_bin.GetLength()
 		
-		#Check which is greater
-		_max_len = _self_len * (_self_len > _other_len) + _other_len * (_self_len <= _other_len)
 		#Append appropriate lengths to appropriate object
 		if Inverse:
-			if _self_len < _max_len:
+			if _self_len < _other_len:
 				_new_self_bin.InverseLengthAppend(_other_len-_self_len)
 			else:
 				_new_other_bin.InverseLengthAppend((_self_len-_other_len)-offset)
@@ -317,11 +324,11 @@ class Binary:
 			
 			return _new_self_bin, _new_other_bin
 		
-		if _self_len < _max_len:
-			if _max_len - _self_len >= 1:
+		if _self_len < _other_len:
+			if _other_len - _self_len >= 1:
 				_new_self_bin.LengthAppend(_other_len-_self_len)
 		else:
-			if _max_len - _other_len >= 1:
+			if _self_len - _other_len >= 1:
 				_new_other_bin.LengthAppend((_self_len-_other_len)-offset)
 				_new_other_bin.InverseLengthAppend(offset)
 		
@@ -645,15 +652,19 @@ class hpf:
 			self.mant_length	= mantissa.GetLength()
 			self.exp_length		= exp.GetLength()
 	
-	def Allign(self, other, additive=True):
+	def Allign(self, other, additive=True, propper_clean=True):
 		bin = Binary()
 		Zero = Binary([False])
 		One = Binary([True])
 		reverse_shift = False
 		
-		#Clone hpf objects to new temporary variables to not mess with original objects
-		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
-		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		if propper_clean:
+			#Clone hpf objects to new temporary variables to not mess with original objects
+			_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
+			_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		else:
+			_new_self = self
+			_new_other = other
 		
 		#Calculate exponent values
 		_self_exp = _new_self.exp.__xor__(_new_self.exp)
@@ -698,14 +709,28 @@ class hpf:
 		
 		return _new_self, _new_other, reverse_shift
 	
-	def __pure_add__(self, other, preemptive_offset=False, set_precision=False):
+	def __pure_add__(self, other, preemptive_offset=False, set_precision=False, propper_clean=True):
 		bin = Binary()
 		Zero = Binary([False],False,True)
 		One = Binary([True],False,True)
 		
-		#Clone hpf objects to new temporary variables to not mess with original objects
-		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
-		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		#Handle zeros
+		if self.is_zero.data[0]:
+			if other.is_zero.data[0]:
+				return hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
+			else:
+				return other
+		else:
+			if other.is_zero.data[0]:
+				return self
+		
+		if propper_clean:
+			#Clone hpf objects to new temporary variables to not mess with original objects
+			_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
+			_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		else:
+			_new_self = self
+			_new_other = other
 		
 		#Calculate exponent values
 		#Zero out exp values for length and value calculations
@@ -733,20 +758,29 @@ class hpf:
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
 		
+		#Get longest mantissa length based on reverse_shift
+		_new_self_mant_len = _new_self.mant.GetLength()
+		_new_other_mant_len = _new_other.mant.GetLength()
+		if type(set_precision) != type(False):
+			t = _new_self.mant.GetLength() - set_precision
+			if t > 0:
+				print("lps: %s" % (t))
+				_new_self.mant.LengthPop(t)
+				_new_other.mant.LengthPop(t)
+		
 		#Allign mantissa
-		_new_self, _new_other, reverse_shift = _new_self.Allign(_new_other)
+		_new_self, _new_other, reverse_shift = _new_self.Allign(_new_other, True, False)
+		
+		#Add mantissa
+		_t_q_mant = _new_self.mant.__float_add__(_new_other.mant, False, False)
 		
 		#Get longest mantissa length based on reverse_shift
 		_new_self_mant_len = _new_self.mant.GetLength()
 		_new_other_mant_len = _new_other.mant.GetLength()
-		
-		#Add mantissa
-		_t_q_mant = _new_self.mant.__float_add__(_new_other.mant)
 		if type(set_precision) != type(False):
-			t = (_t_q_mant.GetLength()-1-_new_self_exp_v.ToInt()) - set_precision
+			t = _t_q_mant.GetLength() - set_precision
 			if t > 0:
 				_t_q_mant.LengthPop(t)
-				_new_self.mant.LengthPop(t)
 		
 		one = Binary([True])
 		#Handle carry out
@@ -801,25 +835,29 @@ class hpf:
 			_t_q_exp.Append(_t_q_exp_v < Zero)
 			i += One
 		
+		return hpf(_t_q_mant, _t_q_exp, self.sign, self.is_zero)
+	def __pure_sub__(self, other, preemptive_offset=False, set_precision=False, propper_clean=True):
+		bin  = Binary()
+		Zero = Binary([False])
+		One  = Binary([True])
+		
 		#Handle zeros
 		if self.is_zero.data[0]:
 			if other.is_zero.data[0]:
 				return hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
 			else:
-				return other
+				return hpf(other.mant, other.exp, Binary([not other.sign.data[0]]), other.is_zero)
 		else:
 			if other.is_zero.data[0]:
-				return self
+				return hpf(self.mant, self.exp, self.sign, self.is_zero)
 		
-		return hpf(_t_q_mant, _t_q_exp, self.sign, self.is_zero)
-	def __pure_sub__(self, other, preemptive_offset=False, set_precision=False):
-		bin  = Binary()
-		Zero = Binary([False])
-		One  = Binary([True])
-		
-		#Clone hpf objects to new temporary variables to not mess with original objects
-		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
-		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		if propper_clean:
+			#Clone hpf objects to new temporary variables to not mess with original objects
+			_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
+			_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		else:
+			_new_self = self
+			_new_other = other
 		
 		#Calculate exponent values
 		_new_self_exp	= _new_self.exp.__xor__(  _new_self.exp)
@@ -853,7 +891,7 @@ class hpf:
 		_t_q_mant_len = _new_self_mant_len * (_new_self_mant_len > _new_other_mant_len) + _new_other_mant_len * (_new_self_mant_len <= _new_other_mant_len)
 		
 		#Add mantissa
-		_t_q_mant = _new_self.mant.__float_sub__(_new_other.mant)
+		_t_q_mant = _new_self.mant.__float_sub__(_new_other.mant, True, False)
 		
 		#Handle carry out
 		if _t_q_mant.co == False:
@@ -912,36 +950,26 @@ class hpf:
 			_t_q_exp.Append(_t_q_exp_v <= Zero)
 			i -= One
 		
-		#Handle zeros
-		if self.is_zero.data[0]:
-			if other.is_zero.data[0]:
-				return hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
-			else:
-				return hpf(other.mant, other.exp, Binary([not other.sign.data[0]]), other.is_zero)
-		else:
-			if other.is_zero.data[0]:
-				return hpf(self.mant, self.exp, self.sign, self.is_zero)
-		
 		return hpf(_t_q_mant, _t_q_exp, _t_q_sign, self.is_zero)
 	
-	def __add__(self, other, preemptive_offset=False, set_precision=False):
+	def __add__(self, other, preemptive_offset=False, set_precision=False, propper_clean=True):
 		if self.sign.data[0]:
 			if other.sign.data[0]:
-				return self.__pure_add__(other, preemptive_offset, set_precision)
-			return self.__pure_sub__(other, preemptive_offset, set_precision)
+				return self.__pure_add__(other, preemptive_offset, set_precision, propper_clean=True)
+			return self.__pure_sub__(other, preemptive_offset, set_precision, propper_clean=True)
 		if other.sign.data[0]:
-			return other.__pure_sub__(self, preemptive_offset, set_precision)
-		return self.__pure_add__(other, preemptive_offset, set_precision)
-	def __sub__(self, other, preemptive_offset=False, set_precision=False):
+			return other.__pure_sub__(self, preemptive_offset, set_precision, propper_clean=True)
+		return self.__pure_add__(other, preemptive_offset, set_precision, propper_clean=True)
+	def __sub__(self, other, preemptive_offset=False, set_precision=False, propper_clean=True):
 		if self.sign.data[0]:
 			if other.sign.data[0]:
-				return self.__pure_sub__(other, preemptive_offset, set_precision)
-			return self.__pure_add__(other, preemptive_offset, set_precision)
+				return self.__pure_sub__(other, preemptive_offset, set_precision, propper_clean=True)
+			return self.__pure_add__(other, preemptive_offset, set_precision, propper_clean=True)
 		if other.sign.data[0]:
-			_t_q = self.__pure_add__(other, preemptive_offset, set_precision)
+			_t_q = self.__pure_add__(other, preemptive_offset, set_precision, propper_clean=True)
 			_t_q.sign.data[0] = False
 			return _t_q
-		_t_q = self.__pure_sub__(other, preemptive_offset, set_precision)
+		_t_q = self.__pure_sub__(other, preemptive_offset, set_precision, propper_clean=True)
 		_t_q.sign.data[0] = not _t_q.sign.data[0]
 		return _t_q
 	
@@ -1072,14 +1100,30 @@ class hpf:
 		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
 		
+		t = _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
+		if t > set_precision:
+			_new_self.mant.LengthPop(t)
+			_new_other.mant.LengthPop(t)
+		
 		# #Allign mantissas
 		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
+		
+		t = _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
+		if t > set_precision:
+			try:
+				_new_self.mant.LengthPop(t)
+			except IndexError:
+				pass
+			try:
+				_new_other.mant.LengthPop(t)
+			except IndexError:
+				pass
 		
 		#Set _t_q_mant_len based on set_precision
 		if type(set_precision) != type(False):
 			_t_q_mant_len = set_precision
 		else:
-			_t_q_mant_len = 2 * _new_self.mant.GetLength()
+			_t_q_mant_len = 2 * _new_self.mant.GetLength() - _t_q_exp_v.ToInt()
 		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		
 		#Calculate actual division
@@ -1470,9 +1514,14 @@ def sqrt(n, depth=2000, iters=15, show_iters=True, show_in_percentage=True):
 				print("q: %s, %s" % (q, q.__repr__()))
 			else:
 				print("i: %s, %s, %s" % (str(i), q, q.__repr__()))
-		q = q.__add__(n.__truediv__(q, depth), NegOne, depth)
+		
+		div = n.__truediv__(q, m.floor(2*depth/3))
 		nt = time()
-		print("dt: %s" % (nt-start))
+		print("div dt: %s" % (nt-start))
+		start = time()
+		q = q.__add__(div, NegOne, depth, False)
+		nt = time()
+		print("add dt: %s" % (nt-start))
 	
 	return q
 
@@ -1544,19 +1593,21 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 		dividend = factorial(four * i) * ((tstt * i) + eht)
 		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
 		
-		print("summated:")
-		summated = summated.__add__(dividend.__truediv__(divisor, depth), False, depth)
+		summated = summated.__add__(dividend.__truediv__(divisor, depth), False, depth, False)
 		
 		i += One
 		
 		nt = time()
 		print("dt: %s" % (nt-start))
 	
+	start = time()
 	pi = One.__truediv__(scalar * summated, depth)
+	nt = time()
+	print("dt: %s" % (nt-start))
 	
 	print(pi)
 	print(pi.__repr__())
 	
 	return pi
 
-hpf_pi = pi(33300, 50)
+hpf_pi = pi(33300, 25)
