@@ -172,13 +172,17 @@ class Binary:
 		
 		return Binary(q)
 	
-	def __pure_add__(self, other, ci=False, append_ci=True):
-		#Clone Binary objects to new temporary variables to not mess with original objects
-		_new_self_bin = Binary(self.data, self.co, self.sign)
-		_new_other_bin = Binary(other.data, other.co, other.sign)
-		
-		#Allign sizes for compatible addition
-		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin)
+	def __pure_add__(self, other, ci=False, append_ci=True, propper_clean=True):
+		if propper_clean:
+			#Clone Binary objects to new temporary variables to not mess with original objects
+			_new_self_bin = Binary(self.data, self.co, self.sign)
+			_new_other_bin = Binary(other.data, other.co, other.sign)
+			
+			#Allign sizes for compatible addition
+			[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin)
+		else:
+			_new_self_bin = self
+			_new_other_bin = other
 		
 		#Create output list
 		q = [False for i in range(_new_self_bin.GetLength())]
@@ -193,13 +197,17 @@ class Binary:
 			q.append(True)
 		
 		return Binary(q, ci, self.sign)
-	def __pure_sub__(self, other, ci=True, using_twos_compliment=True):
-		#Clone Binary objects to new temporary variables to not mess with original objects
-		_new_self_bin = Binary(self.data, self.co, self.sign)
-		_new_other_bin = Binary(other.data, other.co, other.sign)
-		
-		#Allign sizes for compatible addition
-		[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin)
+	def __pure_sub__(self, other, ci=True, using_twos_compliment=True, propper_clean=True):
+		if propper_clean:
+			#Clone Binary objects to new temporary variables to not mess with original objects
+			_new_self_bin = Binary(self.data, self.co, self.sign)
+			_new_other_bin = Binary(other.data, other.co, other.sign)
+			
+			#Allign sizes for compatible addition
+			[_new_self_bin, _new_other_bin] = _new_self_bin.Allign(_new_other_bin)
+		else:
+			_new_self_bin = self
+			_new_other_bin = other
 		
 		#Create output list
 		q = [False for i in range(_new_self_bin.GetLength())]
@@ -1064,14 +1072,14 @@ class hpf:
 		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
 		
-		#Allign mantissas
+		# #Allign mantissas
 		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
 		
 		#Set _t_q_mant_len based on set_precision
 		if type(set_precision) != type(False):
 			_t_q_mant_len = set_precision
 		else:
-			_t_q_mant_len = 2 * _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
+			_t_q_mant_len = 2 * _new_self.mant.GetLength()
 		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		
 		#Calculate actual division
@@ -1080,10 +1088,10 @@ class hpf:
 		_t_other_mant = _new_other.mant
 		for i in range(_max):
 			# print(i)
-			_t_sub_res = _t_self_mant - _t_other_mant
+			_t_sub_res = _t_self_mant.__pure_sub__(_t_other_mant, True, False, False)
 			
 			#If subtraction is positive
-			if _t_sub_res.sign:
+			if _t_sub_res.co == True:
 				_t_q_mant.data[_max-i] = True
 				_new_self.mant = _t_sub_res
 				
@@ -1445,7 +1453,7 @@ def OffsetExponentValue(x, offset):
 	
 	return hpf(x.mant, _t_q_exp, x.sign, x.is_zero)
 
-def sqrt(n, depth=2000, iters=15, show_iters=True):
+def sqrt(n, depth=2000, iters=15, show_iters=True, show_in_percentage=True):
 	NegOne = Binary([True], False, False)
 	Two = _Two.DeepCopy()
 	q = _One.DeepCopy()
@@ -1458,10 +1466,11 @@ def sqrt(n, depth=2000, iters=15, show_iters=True):
 					_i_s = "0" * (len(str(iters))-len(str(i))) + str(i)
 				else:
 					_i_s = str(i)
-				print("i: %s/%s, %s%%" % (_i_s, iters-1, 100*_i/iters))
+				print("i: %s/%s, %s%%" % (_i_s, iters-1, 100*i/iters))
+				print("q: %s, %s" % (q, q.__repr__()))
 			else:
 				print("i: %s, %s, %s" % (str(i), q, q.__repr__()))
-		q = q.__add__(n / q, NegOne)
+		q = q.__add__(n.__truediv__(q, depth), NegOne, depth)
 		nt = time()
 		print("dt: %s" % (nt-start))
 	
@@ -1510,6 +1519,12 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
 	
+	#Scalar
+	print("\nScalar")
+	
+	trt = two * sqrt(two, depth, iters, show_iters, show_in_percentage)
+	scalar = trt/x_to_the_y(nn, two)
+	
 	#Main Ramanujan-Sato body
 	print("\nMain Ramanujan-Sato body:")
 	
@@ -1529,18 +1544,13 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 		dividend = factorial(four * i) * ((tstt * i) + eht)
 		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
 		
-		summated = summated.__add__(dividend.__truediv__(divisor, depth), False)
+		print("summated:")
+		summated = summated.__add__(dividend.__truediv__(divisor, depth), False, depth)
 		
 		i += One
 		
 		nt = time()
 		print("dt: %s" % (nt-start))
-	
-	#Scalar
-	print("\nScalar")
-	
-	trt = two * sqrt(two, depth, iters, show_iters, show_in_percentage)
-	scalar = trt/x_to_the_y(nn, two)
 	
 	pi = One.__truediv__(scalar * summated, depth)
 	
@@ -1549,4 +1559,4 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 	
 	return pi
 
-hpf_pi = pi(33300, 25)
+hpf_pi = pi(33300, 50)
