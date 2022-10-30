@@ -398,6 +398,13 @@ class Binary:
 	def GetLength(self):
 		return len(self.data)
 	
+	def CountOnes(self):
+		q = 0
+		for i, e in enumerate(self.data):
+			if e:
+				q += 1
+		return q
+	
 	def __eq__(self, other):
 		#Clone Binary objects to new temporary variables to not mess with original objects
 		_new_self_bin = Binary(self.data, self.co, self.sign)
@@ -575,6 +582,9 @@ class Binary:
 		return _str
 	
 	def __str__(self):
+		depth = 85
+		if self.GetLength()-1 > depth:
+			return str(self.LimitedToInt(depth) * (1 * self.sign + -1 * (not self.sign)))
 		return str(self.ToInt() * (1 * self.sign + -1 * (not self.sign)))
 
 def ReturnableDoubleToBin(a, precision=0):
@@ -1068,6 +1078,7 @@ class hpf:
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
 	def __truediv__(self, other, set_precision=False, preemptive_offset=None):
+		# print("\nhpf.__truediv__():")
 		bin = Binary()
 		One = Binary([True])
 		Zero = Binary([False])
@@ -1102,13 +1113,13 @@ class hpf:
 		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
 		
-		t = _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
-		if t > set_precision:
-			try:
-				_new_self.mant.LengthPop(t)
-				_new_other.mant.LengthPop(t)
-			except IndexError:
-				pass
+		# t = _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
+		# if t > set_precision:
+			# try:
+				# _new_self.mant.LengthPop(t)
+				# _new_other.mant.LengthPop(t)
+			# except IndexError:
+				# pass
 		
 		# #Allign mantissas
 		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
@@ -1128,41 +1139,54 @@ class hpf:
 		if type(set_precision) != type(False):
 			_t_q_mant_len = set_precision
 		else:
-			_t_q_mant_len = 2 * _new_self.mant.GetLength() - _t_q_exp_v.ToInt()
+			_t_q_mant_len = 2 * _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
 		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		
 		#Calculate actual division
 		_max = _t_q_mant.GetLength()-1
 		_t_self_mant = _new_self.mant
 		_t_other_mant = _new_other.mant
+		offset = 0
 		for i in range(_max):
+			print("i: %s" % (i))
 			_t_sub_res = _t_self_mant.__pure_sub__(_t_other_mant, True, False, False)
+			# print("_new_self.mant: %s" % (_new_self.mant.__repr__()))
+			# print("_t_sub_res: %s" % (_t_sub_res.__repr__()))
+			
+			_n_s_m_o = _new_self.mant.CountOnes()
+			_s_c = Binary(_new_self.mant.data)
+			try:
+				_s_c.LengthPop(offset)
+			except IndexError:
+				pass
+			
+			# print("_s_c: %s" % (_s_c))
+			# if _new_self.mant.CountOnes() <= 2:
+			if str(_s_c) in remainders:
+				__max = _max-i-1
+				# print("using: %s" % (_s_c))
+				for j in range(__max):
+					_t_q_mant.data[__max-j] = remainders[str(_s_c)][j % (len(remainders[str(_s_c)]))]
+				break
+			# print("added: %s" % (_s_c))
+			remainders[str(_s_c)] = []
 			
 			#If subtraction is positive
 			if _t_sub_res.co == True:
-				if str(_t_sub_res) in remainders:
-					try:
-						__max = _max-i
-						for j in range(__max):
-							_t_q_mant.data[__max-j] = remainders[str(_t_sub_res)][(__max-j) % (len(remainders[str(_t_sub_res)]))]
-						break
-					except ZeroDivisionError:
-						break
-				else:
-					_t_q_mant.data[_max-i] = True
-					_new_self.mant = _t_sub_res
-					
-					_t_self_mant = _new_self.mant
-					_t_other_mant = _new_other.mant
-					remainders[str(_t_sub_res)] = []
-			try:
-				for key in remainders:
-					remainders[key].insert(0, _t_sub_res.co)
-			except:
-				pass
+				offset = 0
+				_t_q_mant.data[_max-i] = True
+				_new_self.mant = _t_sub_res
 				
+				_t_self_mant = _new_self.mant
+				_t_other_mant = _new_other.mant
+				
+			for key in remainders:
+				remainders[key].insert(0, _t_sub_res.co)
+			
 			_t_self_mant.InverseAppend(False)
 			_t_other_mant.Append(False)
+			
+			offset += 1
 		
 		#Find leading one
 		largest_one = -1
@@ -1593,6 +1617,8 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 	trt = two * sqrt(two, depth, iters, show_iters, show_in_percentage)
 	scalar = trt/x_to_the_y(nn, two)
 	
+	raise CustomException("idk")
+	
 	#Main Ramanujan-Sato body
 	print("\nMain Ramanujan-Sato body:")
 	
@@ -1622,20 +1648,20 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 	start = time()
 	pi = One.__truediv__(scalar * summated, depth)
 	nt = time()
-	print("dt: %s" % (nt-start))
+	print("dt last div: %s" % (nt-start))
 	
 	print(pi)
 	print(pi.__repr__())
 	
 	return pi
 
-hpf_pi = pi(1000, 50)
+hpf_pi = pi(33300, 15)
 
 def test():
 	a = hpf()
 	b = hpf()
 	
-	a.mant		= Binary([1,0])
+	a.mant		= Binary([1,1,0])
 	a.exp		= Binary([1,0,0])
 	a.sign		= Binary([True])
 	a.is_zero	= Binary([False])
