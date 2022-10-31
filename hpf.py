@@ -342,8 +342,14 @@ class Binary:
 		_self_len = _new_self_bin.GetLength()
 		_other_len = _new_other_bin.GetLength()
 		
-		_new_self_bin.InverseLengthAppend(offset)
-		_new_other_bin.LengthAppend(offset)
+		if _other_len > _self_len:
+			_new_self_bin.InverseLengthAppend(_other_len - _self_len)
+			_new_self_bin.LengthAppend(offset)
+			_new_other_bin.LengthAppend(offset)
+		else:
+			_new_other_bin.InverseLengthAppend(_self_len - _other_len)
+			_new_self_bin.LengthAppend(offset)
+			_new_other_bin.LengthAppend(offset)
 		
 		return _new_self_bin, _new_other_bin
 	
@@ -1078,12 +1084,9 @@ class hpf:
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
 	def __truediv__(self, other, set_precision=False, preemptive_offset=None):
-		# print("\nhpf.__truediv__():")
 		bin = Binary()
 		One = Binary([True])
 		Zero = Binary([False])
-		
-		remainders = dict()
 		
 		#Handle zeros
 		if self.is_zero.data[0]:
@@ -1113,80 +1116,31 @@ class hpf:
 		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
 		
-		# t = _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
-		# if t > set_precision:
-			# try:
-				# _new_self.mant.LengthPop(t)
-				# _new_other.mant.LengthPop(t)
-			# except IndexError:
-				# pass
-		
-		# #Allign mantissas
-		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
-		
-		t = _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
-		if t > set_precision:
-			try:
-				_new_self.mant.LengthPop(t)
-			except IndexError:
-				pass
-			try:
-				_new_other.mant.LengthPop(t)
-			except IndexError:
-				pass
-		
 		#Set _t_q_mant_len based on set_precision
 		if type(set_precision) != type(False):
 			_t_q_mant_len = set_precision
 		else:
 			_t_q_mant_len = 2 * _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
-		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
+		_t_q_mant = Binary([False for i in range(_t_q_mant_len + 1)])
 		
 		#Calculate actual division
+		_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, 1)
 		_max = _t_q_mant.GetLength()-1
-		_t_self_mant = _new_self.mant
-		_t_other_mant = _new_other.mant
-		offset = 0
+		
 		for i in range(_max):
-			print("i: %s" % (i))
-			_t_sub_res = _t_self_mant.__pure_sub__(_t_other_mant, True, False, False)
-			# print("_new_self.mant: %s" % (_new_self.mant.__repr__()))
-			# print("_t_sub_res: %s" % (_t_sub_res.__repr__()))
 			
-			_n_s_m_o = _new_self.mant.CountOnes()
-			_s_c = Binary(_new_self.mant.data)
-			try:
-				_s_c.LengthPop(offset)
-			except IndexError:
-				pass
-			
-			# print("_s_c: %s" % (_s_c))
-			# if _new_self.mant.CountOnes() <= 2:
-			if str(_s_c) in remainders:
-				__max = _max-i-1
-				# print("using: %s" % (_s_c))
-				for j in range(__max):
-					_t_q_mant.data[__max-j] = remainders[str(_s_c)][j % (len(remainders[str(_s_c)]))]
-				break
-			# print("added: %s" % (_s_c))
-			remainders[str(_s_c)] = []
+			_t_s_res = _t_self_mant >= _t_other_mant
 			
 			#If subtraction is positive
-			if _t_sub_res.co == True:
-				offset = 0
+			if _t_s_res:
 				_t_q_mant.data[_max-i] = True
-				_new_self.mant = _t_sub_res
-				
-				_t_self_mant = _new_self.mant
-				_t_other_mant = _new_other.mant
-				
-			for key in remainders:
-				remainders[key].insert(0, _t_sub_res.co)
+				_t_self_mant = _t_self_mant - _t_other_mant
 			
 			_t_self_mant.InverseAppend(False)
-			_t_other_mant.Append(False)
+			_t_self_mant.Pop(-1)
 			
-			offset += 1
+			if _t_self_mant.ToInt() == 0:
+				break
 		
 		#Find leading one
 		largest_one = -1
@@ -1409,14 +1363,39 @@ _Zero = hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
 _One = hpf(Binary([False]), Binary([True]), Binary([True]), Binary([False]))
 _Two = hpf(Binary([False]), Binary([False]), Binary([True]), Binary([False]))
 
+fc = dict()
+
 def factorial(n: hpf):
+	ni = str(n.ToFloat())
 	One = _One.DeepCopy()
 	i = _One.DeepCopy()
 	q = _One.DeepCopy()
+	
+	global fc
+	
 	top = n + One
+	
+	if ni in fc:
+		return fc[ni][0]
+	largest = None
+	for key in fc:
+		if float(key) < n.ToFloat():
+			largest = key
+	if type(largest) != type(None):
+		q = fc[largest][0]
+		i = fc[largest][1]
+		while i != top:
+			q *= i
+			i += One
+		
+		fc[ni] = [q, i]
+	
 	while i != top:
 		q *= i
 		i += One
+	
+	if str(n) not in fc:
+		fc[ni] = [q, i]
 	return q
 
 xtyc = dict()
@@ -1426,38 +1405,39 @@ def x_to_the_y(x, y):
 	
 	global xtyc
 	
-	if str(x.ToFloat()) in xtyc:
-		if str(y.ToFloat()) in xtyc[str(x.ToFloat())]:
-			return xtyc[str(x.ToFloat())][str(y.ToFloat())][0]
-		largest = list(xtyc[str(x.ToFloat())].keys())[-1]
+	xi = str(x.ToFloat())
+	
+	_max = y.DeepCopy() + One
+	
+	if xi in xtyc:
+		if str(y.ToFloat()) in xtyc[xi]:
+			return xtyc[xi][str(y.ToFloat())][0]
+		largest = list(xtyc[xi].keys())[-1]
 		if int(largest[0]) < y.ToFloat():
-			q = xtyc[str(x.ToFloat())][largest][0]
-			i = xtyc[str(x.ToFloat())][largest][1]
-			_max = y.DeepCopy() + One
+			q = xtyc[xi][largest][0]
+			i = xtyc[xi][largest][1]
 			while i < _max:
 				q *= x
 				i += One
-			xtyc[str(x.ToFloat())] = dict()
-			xtyc[str(x.ToFloat())][str(y.ToFloat())] = [q,i]
+			xtyc[xi] = dict()
+			xtyc[xi][str(y.ToFloat())] = [q,i]
 			return q
 	
 	i = _One.DeepCopy()
 	q = One.DeepCopy()
-	_max = y.DeepCopy() + One
 	while i.Abs() < _max.Abs():
 		q *= x
 		i += One
 	
 	if str(x) not in xtyc:
-		xtyc[str(x.ToFloat())] = dict()
-		xtyc[str(x.ToFloat())][str(y.ToFloat())] = [q,i]
+		xtyc[xi] = dict()
+		xtyc[xi][str(y.ToFloat())] = [q,i]
 	return q
 
 def _exp_temp(n):
 	print("_exp_temp:")
 	One = _One.DeepCopy()
-	Two = _Two.DeepCopy()
-	q = OffsetExponentValue(Two, Binary([True]))
+	q = OffsetExponentValue(n, Binary([True]))
 	q = q + One
 	return q
 
@@ -1540,35 +1520,34 @@ def OffsetExponentValue(x, offset):
 	
 	return hpf(x.mant, _t_q_exp, x.sign, x.is_zero)
 
-def sqrt(n, depth=2000, iters=15, show_iters=True, show_in_percentage=True):
+def sqrt(n, depth=500, iters=25, show_iters=False, show_in_percentage=False, show_time=False):
 	NegOne = Binary([True], False, False)
 	Two = _Two.DeepCopy()
 	q = _One.DeepCopy()
 	
 	for i in range(iters):
-		start = time()
 		if show_iters == True:
 			if show_in_percentage:
 				if len(str(i)) < len(str(iters)):
 					_i_s = "0" * (len(str(iters))-len(str(i))) + str(i)
 				else:
 					_i_s = str(i)
-				print("i: %s/%s, %s%%" % (_i_s, iters-1, 100*i/iters))
+				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*i/iters)/100))
 				print("q: %s, %s" % (q, q.__repr__()))
 			else:
 				print("i: %s, %s, %s" % (str(i), q, q.__repr__()))
 		
-		div = n.__truediv__(q, m.floor(2*depth/3))
-		nt = time()
-		print("div dt: %s" % (nt-start))
 		start = time()
-		q = q.__add__(div, NegOne, depth, False)
-		nt = time()
-		print("add dt: %s" % (nt-start))
-	
+		
+		q = q.__add__(n.__truediv__(q, depth), NegOne)
+		
+		if show_time:
+			nt = time()
+			print("dt: %s" % (nt-start))
+		
 	return q
 
-def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
+def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_time=True):
 	global xtyc
 	One				= _One.DeepCopy()
 	two				= _Two.DeepCopy()
@@ -1611,14 +1590,6 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
 	
-	#Scalar
-	print("\nScalar")
-	
-	trt = two * sqrt(two, depth, iters, show_iters, show_in_percentage)
-	scalar = trt/x_to_the_y(nn, two)
-	
-	raise CustomException("idk")
-	
 	#Main Ramanujan-Sato body
 	print("\nMain Ramanujan-Sato body:")
 	
@@ -1629,8 +1600,8 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 				if len(str(_i)) < len(str(iters)):
 					_i_s = "0" * (len(str(iters))-len(str(_i))) + str(_i)
 				else:
-					_i_s = str(i)
-				print("i: %s/%s, %s%%" % (_i_s, iters-1, 100*_i/iters))
+					_i_s = str(m.floor(i.ToFloat()))
+				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*_i/iters)/100))
 				print("q: %s, %s" % (summated, summated.__repr__()))
 			else:
 				print("i: %s, %s, %s" % (_i, str(summated), summated.__repr__()))
@@ -1642,41 +1613,26 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True):
 		
 		i += One
 		
-		nt = time()
-		print("dt: %s" % (nt-start))
+		if show_time:
+			nt = time()
+			print("dt: %s" % (nt-start))
+	
+	#Scalar
+	print("\nScalar")
+	
+	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
+	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
 	
 	start = time()
 	pi = One.__truediv__(scalar * summated, depth)
-	nt = time()
-	print("dt last div: %s" % (nt-start))
+	
+	if show_time:
+		nt = time()
+		print("dt last div: %s" % (nt-start))
 	
 	print(pi)
 	print(pi.__repr__())
 	
 	return pi
 
-hpf_pi = pi(33300, 15)
-
-def test():
-	a = hpf()
-	b = hpf()
-	
-	a.mant		= Binary([1,1,0])
-	a.exp		= Binary([1,0,0])
-	a.sign		= Binary([True])
-	a.is_zero	= Binary([False])
-	
-	b.mant		= Binary([1])
-	b.exp		= Binary([1,0])
-	b.sign		= Binary([True])
-	b.is_zero	= Binary([False])
-	
-	print(a)
-	print(b)
-	
-	c = a.__truediv__(b, 100)
-	
-	print(c)
-	print(c.__repr__())
-
-# test()
+hpf_pi = pi(3330, 25, True, True, True)
