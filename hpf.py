@@ -1121,7 +1121,11 @@ class hpf:
 			_t_q_exp.Append(_t_q_exp_v < Zero)
 			i -= One
 		
-		return hpf(_t_q_mant, _t_q_exp, _new_self.sign, self.is_zero)
+		q = hpf(_t_q_mant, _t_q_exp, _new_self.sign, self.is_zero)
+		
+		print("q: %s, %s" % (q, q.__repr__()))
+		
+		return q
 	
 	def __eq__(self, other):
 		#Clone hpf objects to new temporary variables to not mess with original objects
@@ -1423,7 +1427,7 @@ def sqrt(n, depth=2000, iters=15, show_iters=True):
 	
 	return q
 
-def pi(depth=10000, iters=10):
+def pi(depth=10000, iters=10, show_iters=True):
 	One				= _One.DeepCopy()
 	two				= _Two.DeepCopy()
 	four			= hpf()
@@ -1462,8 +1466,10 @@ def pi(depth=10000, iters=10):
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
-	trt = two * sqrt(two, depth, iters)
+	trt = two * sqrt(two, depth, iters, show_iters)
 	scalar = trt/x_to_the_y(nn, two)
+	
+	raise CustomException("idk")
 	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
@@ -1483,3 +1489,4 @@ def pi(depth=10000, iters=10):
 	
 	return pi
 
+hpf_pi = pi(1000, 15, False)
