@@ -1307,25 +1307,77 @@ _Zero = hpf(Binary([False]), Binary([False]), Binary([True]), Binary([True]))
 _One = hpf(Binary([False]), Binary([True]), Binary([True]), Binary([False]))
 _Two = hpf(Binary([False]), Binary([False]), Binary([True]), Binary([False]))
 
+fc = dict()
+
 def factorial(n: hpf):
+	ni = str(n.ToFloat())
 	One = _One.DeepCopy()
 	i = _One.DeepCopy()
 	q = _One.DeepCopy()
+	
+	global fc
+	
 	top = n + One
+	
+	if ni in fc:
+		return fc[ni][0]
+	largest = None
+	for key in fc:
+		if float(key) < n.ToFloat():
+			largest = key
+	if type(largest) != type(None):
+		q = fc[largest][0]
+		i = fc[largest][1]
+		while i != top:
+			q *= i
+			i += One
+		
+		fc[ni] = [q, i]
+	
 	while i != top:
 		q *= i
 		i += One
+	
+	if str(n) not in fc:
+		fc[ni] = [q, i]
 	return q
+
+xtyc = dict()
 
 def x_to_the_y(x, y):
 	One = _One.DeepCopy()
+	
+	global xtyc
+	
+	xi = str(x.ToFloat())
+	
+	_max = y.DeepCopy() + One
+	
+	if xi in xtyc:
+		if str(y.ToFloat()) in xtyc[xi]:
+			return xtyc[xi][str(y.ToFloat())][0]
+		largest = list(xtyc[xi].keys())[-1]
+		if int(largest[0]) < y.ToFloat():
+			q = xtyc[xi][largest][0]
+			i = xtyc[xi][largest][1]
+			while i < _max:
+				q *= x
+				i += One
+			xtyc[xi] = dict()
+			xtyc[xi][str(y.ToFloat())] = [q,i]
+			return q
+	
 	i = _One.DeepCopy()
 	q = One.DeepCopy()
-	_max = y.DeepCopy() + One
 	while i.Abs() < _max.Abs():
 		q *= x
 		i += One
+	
+	if str(x) not in xtyc:
+		xtyc[xi] = dict()
+		xtyc[xi][str(y.ToFloat())] = [q,i]
 	return q
+
 
 def _exp_temp(n):
 	One = _One.DeepCopy()
