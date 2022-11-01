@@ -1167,6 +1167,7 @@ class hpf:
 					if _t_s_res:
 						_t_q_mant.data[_max-i] = True
 						_t_self_mant = _t_self_mant - _t_other_mant
+					
 					_t_self_mant.InverseAppend(False)
 					_t_self_mant.Pop(-1)
 					
