@@ -1059,7 +1059,7 @@ class hpf:
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
 		
 		#Allign mantissas
-		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant, True)
+		_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant)
 		
 		#Set _t_q_mant_len based on set_precision
 		if type(set_precision) != type(False):
@@ -1072,15 +1072,18 @@ class hpf:
 		offs = 0
 		_max = _t_q_mant.GetLength()-1
 		for i in range(_max):
-			_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, offs)
-			offs += 1
-			_t_sub_res = _t_self_mant - _t_other_mant
+			_t_s_res = _t_self_mant >= _t_other_mant
 			
 			#If subtraction is positive
-			if _t_sub_res.sign:
-				offs = 1
+			if _t_s_res:
 				_t_q_mant.data[_max-i] = True
-				_new_self.mant = _t_sub_res
+				_t_self_mant = _t_self_mant - _t_other_mant
+			
+			_t_self_mant.InverseAppend(False)
+			_t_self_mant.Pop(-1)
+			
+			if _t_self_mant.ToInt() == 0:
+				break
 		
 		#Find leading one
 		largest_one = -1
