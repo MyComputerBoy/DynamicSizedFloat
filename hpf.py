@@ -1123,7 +1123,7 @@ class hpf:
 		
 		q = hpf(_t_q_mant, _t_q_exp, _new_self.sign, self.is_zero)
 		
-		print("q: %s, %s" % (q, q.__repr__()))
+		# print("q: %s, %s" % (q, q.__repr__()))
 		
 		return q
 	
@@ -1489,4 +1489,4 @@ def pi(depth=10000, iters=10, show_iters=True):
 	
 	return pi
 
-hpf_pi = pi(1000, 15, False)
+hpf_pi = pi(1000, 15, True)
