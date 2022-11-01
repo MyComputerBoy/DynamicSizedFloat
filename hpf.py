@@ -1135,11 +1135,16 @@ class hpf:
 			
 			_t_s_res = _t_self_mant >= _t_other_mant
 			
-			__t_s = Binary(_t_self_mant.data[-13:-1])
+			__t_s = Binary(_t_self_mant.data[-25:-1])
 			
 			key = str(__t_s.__repr__())
 			
-			# print("__t_s: %s" % (__t_s.__repr__()))
+			# if _t_s_res:
+				# t_s = "1"
+			# else:
+				# t_s = " "
+			
+			# print("__t_s: %s %s" % (__t_s.__repr__(), t_s))
 			
 			#If subtraction is positive
 			if _t_s_res:
@@ -1149,11 +1154,11 @@ class hpf:
 			if __t_s.ToInt() != 0:
 				if key in remainders:
 					# print("found")
-					__max = _max - i + 1
+					__max = _max - i
 					# remainders[key].append(_t_s_res)
 					r_l = len(remainders[key])
-					for j in range(__max):
-						_t_q_mant.data[__max - j - 1] = remainders[key][j % r_l]
+					for j in range(__max + 1):
+						_t_q_mant.data[__max - j] = remainders[key][j % r_l]
 					break
 				else:
 					remainders[key] = []
