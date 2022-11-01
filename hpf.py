@@ -1025,12 +1025,25 @@ class hpf:
 			_t_q_exp_v.Append(True)
 		
 		#Make _t_q object for computation
-		_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()
-		_t_q = Binary([False for i in range(_t_q_mant_len)])
-		
-		#Calculate multiplication of mantissa
-		co_offset = 0
-		_t_q, _t_other = _t_q.Allign(_new_other.mant, True)
+		if type(set_precision) != type(False):
+			_t_q_mant_len = set_precision
+			_t_q = Binary([False for i in range(_t_q_mant_len)])		
+			
+			#Calculate multiplication of mantissa
+			co_offset = 0
+			_t_q, _t_other = _t_q.Allign(_new_other.mant, True)
+
+			if _t_q.GetLength() > set_precision:
+				diff = _t_q.GetLength() - set_precision
+				_t_q.LengthPop(diff)
+				_t_other.LengthPop(diff)
+		else:
+			_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()
+			_t_q = Binary([False for i in range(_t_q_mant_len)])
+			
+			#Calculate multiplication of mantissa
+			co_offset = 0
+			_t_q, _t_other = _t_q.Allign(_new_other.mant, True)
 		
 		for i in range(_new_self.mant.GetLength()-1, -1, -1):
 			if _new_self.mant.data[i]:
@@ -1083,7 +1096,7 @@ class hpf:
 			i -= One
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
-	def __truediv__(self, other, set_precision=False, preemptive_offset=None, quick_size=5001):
+	def __truediv__(self, other, set_precision=False, preemptive_offset=None, quick_size=5001, short=True, show_in_percentage=False):
 		# print("\nhpf: %s.__truediv__(%s):" % (self, other))
 		bin = Binary()
 		One = Binary([True])
@@ -1138,19 +1151,40 @@ class hpf:
 		
 		remainders = dict()
 		
-		if quick_size == 0:
-			for i in range(_max):
-				_t_s_res = _t_self_mant >= _t_other_mant
-				
-				#If subtraction is positive
-				if _t_s_res:
-					_t_q_mant.data[_max-i] = True
-					_t_self_mant = _t_self_mant - _t_other_mant
-				_t_self_mant.InverseAppend(False)
-				_t_self_mant.Pop(-1)
-				
-				if _t_self_mant.ToInt() == 0:
-					break
+		if short == False:
+			if show_in_percentage:
+				origin_time = time()
+				lp = 0
+				for i in range(_max):
+					nt = time()
+					percent = m.floor(100*i/_max)/100
+					if percent > lp:
+						print("i: %s/%s, %s%%, eta: %s" % (i, _max, m.floor(10000*i/_max)/100, m.floor(100*(_max-i)*(nt-origin_time)/(i+1))/100))
+						lp = percent
+					_t_s_res = _t_self_mant >= _t_other_mant
+					
+					#If subtraction is positive
+					if _t_s_res:
+						_t_q_mant.data[_max-i] = True
+						_t_self_mant = _t_self_mant - _t_other_mant
+					_t_self_mant.InverseAppend(False)
+					_t_self_mant.Pop(-1)
+					
+					if _t_self_mant.ToInt() == 0:
+						break
+			else:
+				for i in range(_max):
+					_t_s_res = _t_self_mant >= _t_other_mant
+					
+					#If subtraction is positive
+					if _t_s_res:
+						_t_q_mant.data[_max-i] = True
+						_t_self_mant = _t_self_mant - _t_other_mant
+					_t_self_mant.InverseAppend(False)
+					_t_self_mant.Pop(-1)
+					
+					if _t_self_mant.ToInt() == 0:
+						break
 		else:
 			for i in range(_max):
 				_t_s_res = _t_self_mant >= _t_other_mant
@@ -1168,7 +1202,7 @@ class hpf:
 					if key in remainders:
 						__max = _max - i
 						r_l = len(remainders[key])
-						for j in range(__max + 1):
+						for j in range(__max-1):
 							_t_q_mant.data[__max - j] = remainders[key][j % r_l]
 						break
 					else:
@@ -1570,10 +1604,14 @@ def sqrt(n, depth=500, iters=25, show_iters=False, show_in_percentage=False, sho
 	Two = _Two.DeepCopy()
 	q = _One.DeepCopy()
 	
+	ldt = 0
+	
+	origin_time = time()
+	
 	for i in range(iters):
 		start = time()
 		
-		q = q.__add__(n.__truediv__(q, depth, None, 30000), NegOne)
+		q = q.__add__(n.__truediv__(q, depth), NegOne)
 		
 		if show_iters == True:
 			if show_in_percentage:
@@ -1588,9 +1626,25 @@ def sqrt(n, depth=500, iters=25, show_iters=False, show_in_percentage=False, sho
 		
 		if show_time:
 			nt = time()
-			print("dt: %s" % (nt-start))
+			dt = nt - start
+			if i == 0:
+				first_dt = dt
+			print("dt: %s" % (dt))
+			print("eta: %s" % (estimate_time(origin_time, nt, iters, i)))
 		
 	return q
+
+def estimate_time(origin_time, now_time, iters, _i):
+	q = (iters-_i)*(now_time - origin_time)/(_i+1)
+	
+	if abs(q) > 60:
+		min = m.floor((q - (q % 60))/60)
+		s = m.floor(100*(q % 60))/100
+		q =  m.floor(100*(q % 60))/100
+		
+		return q
+	
+	return m.floor(100*q)/100
 
 def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_time=True):
 	global xtyc
@@ -1632,11 +1686,23 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
+	#Scalar
+	print("\nScalar")
+	
+	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
+	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
+	
+	# raise CustomException("idk")
+	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
 	
 	#Main Ramanujan-Sato body
 	print("\nMain Ramanujan-Sato body:")
+	
+	ldt = 0
+	
+	origin_time = time()
 	
 	for _i in range(iters):
 		start = time()
@@ -1645,8 +1711,6 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 		
 		summated = summated.__add__(dividend.__truediv__(divisor, depth, None, 0), False, depth, False)
 		
-		i += One
-	
 		if show_iters:
 			if show_in_percentage:
 				if len(str(_i)) < len(str(iters)):
@@ -1660,18 +1724,16 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 			
 		if show_time:
 			nt = time()
-			print("dt: %s" % (nt-start))
+			dt = nt-start
+			if _i == 0:
+				first_dt = dt
+			print("dt:  %s" % (dt))
+			print("eta: %s" % (estimate_time(origin_time, nt, iters, _i)))
 	
-	#Scalar
-	print("\nScalar")
-	
-	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
-	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
-	
-	# raise CustomException("idk")
+		i += One
 	
 	start = time()
-	pi = One.__truediv__(scalar * summated, depth, None, 0)
+	pi = One.__truediv__(scalar.__mul__(summated, depth), depth, None, 0, False, True)
 	
 	if show_time:
 		nt = time()
@@ -1682,4 +1744,4 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	
 	return pi
 
-hpf_pi = pi(33300, 50, True, True, True)
+hpf_pi = pi(2500, 40, True, True, True)
