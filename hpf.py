@@ -1083,7 +1083,8 @@ class hpf:
 			i -= One
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
-	def __truediv__(self, other, set_precision=False, preemptive_offset=None):
+	def __truediv__(self, other, set_precision=False, buffer=15, preemptive_offset=None):
+		# print("\nhpf: %s.__truediv__(%s):" % (self, other))
 		bin = Binary()
 		One = Binary([True])
 		Zero = Binary([False])
@@ -1121,15 +1122,36 @@ class hpf:
 			_t_q_mant_len = set_precision
 		else:
 			_t_q_mant_len = 2 * _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
-		_t_q_mant = Binary([False for i in range(_t_q_mant_len + 1)])
+		_t_q_mant = Binary([False for i in range(_t_q_mant_len+buffer)])
 		
 		#Calculate actual division
 		_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, 1)
 		_max = _t_q_mant.GetLength()-1
 		
+		remainders = dict()
+		
 		for i in range(_max):
+			# print("i: %s" % (i))
 			
 			_t_s_res = _t_self_mant >= _t_other_mant
+			
+			__t_s = Binary(_t_self_mant.data[-13:-1])
+			
+			key = str(__t_s.__repr__())
+			
+			# print("__t_s: %s" % (__t_s.__repr__()))
+			
+			if __t_s.ToInt() != 0:
+				if key in remainders:
+					# print("found")
+					__max = _max - i - 1
+					remainders[key].append(_t_s_res)
+					r_l = len(remainders[key])
+					for j in range(__max):
+						_t_q_mant.data[__max - j] = remainders[key][j % r_l]
+					break
+				else:
+					remainders[key] = []
 			
 			#If subtraction is positive
 			if _t_s_res:
@@ -1138,6 +1160,9 @@ class hpf:
 			
 			_t_self_mant.InverseAppend(False)
 			_t_self_mant.Pop(-1)
+			
+			for t_key in remainders:
+				remainders[t_key].append(_t_s_res)
 			
 			if _t_self_mant.ToInt() == 0:
 				break
@@ -1181,7 +1206,11 @@ class hpf:
 			_t_q_exp.Append(_t_q_exp_v < Zero)
 			i -= One
 		
-		return hpf(_t_q_mant, _t_q_exp, _new_self.sign, self.is_zero)
+		q = hpf(_t_q_mant, _t_q_exp, _new_self.sign, self.is_zero)
+		
+		# print("q: %s, %s\n" % (q, q.__repr__()))
+		
+		return q
 	
 	def __eq__(self, other):
 		#Clone hpf objects to new temporary variables to not mess with original objects
@@ -1587,6 +1616,14 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
+	#Scalar
+	print("\nScalar")
+	
+	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
+	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
+	
+	# raise CustomException("idk")
+	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
 	
@@ -1617,12 +1654,6 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 			nt = time()
 			print("dt: %s" % (nt-start))
 	
-	#Scalar
-	print("\nScalar")
-	
-	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
-	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
-	
 	start = time()
 	pi = One.__truediv__(scalar * summated, depth)
 	
@@ -1635,4 +1666,4 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	
 	return pi
 
-hpf_pi = pi(3330, 25, True, True, True)
+hpf_pi = pi(1000, 25, True, True, True)
