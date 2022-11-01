@@ -337,8 +337,14 @@ class Binary:
 		_self_len = _new_self_bin.GetLength()
 		_other_len = _new_other_bin.GetLength()
 		
-		_new_self_bin.InverseLengthAppend(offset)
-		_new_other_bin.LengthAppend(offset)
+		if _other_len > _self_len:
+			_new_self_bin.InverseLengthAppend(_other_len - _self_len)
+			_new_self_bin.LengthAppend(offset)
+			_new_other_bin.LengthAppend(offset)
+		else:
+			_new_other_bin.InverseLengthAppend(_self_len - _other_len)
+			_new_self_bin.LengthAppend(offset)
+			_new_other_bin.LengthAppend(offset)
 		
 		return _new_self_bin, _new_other_bin
 	
