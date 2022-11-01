@@ -1083,7 +1083,7 @@ class hpf:
 			i -= One
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
-	def __truediv__(self, other, set_precision=False, buffer=15, preemptive_offset=None):
+	def __truediv__(self, other, set_precision=False, preemptive_offset=None):
 		# print("\nhpf: %s.__truediv__(%s):" % (self, other))
 		bin = Binary()
 		One = Binary([True])
@@ -1122,7 +1122,7 @@ class hpf:
 			_t_q_mant_len = set_precision
 		else:
 			_t_q_mant_len = 2 * _new_self.mant.GetLength() + _t_q_exp_v.ToInt()
-		_t_q_mant = Binary([False for i in range(_t_q_mant_len+buffer)])
+		_t_q_mant = Binary([False for i in range(_t_q_mant_len)])
 		
 		#Calculate actual division
 		_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, 1)
@@ -1141,22 +1141,22 @@ class hpf:
 			
 			# print("__t_s: %s" % (__t_s.__repr__()))
 			
-			if __t_s.ToInt() != 0:
-				if key in remainders:
-					# print("found")
-					__max = _max - i - 1
-					# remainders[key].append(_t_s_res)
-					r_l = len(remainders[key])
-					for j in range(__max):
-						_t_q_mant.data[__max - j] = remainders[key][j % r_l]
-					break
-				else:
-					remainders[key] = []
-			
 			#If subtraction is positive
 			if _t_s_res:
 				_t_q_mant.data[_max-i] = True
 				_t_self_mant = _t_self_mant - _t_other_mant
+			
+			if __t_s.ToInt() != 0:
+				if key in remainders:
+					# print("found")
+					__max = _max - i + 1
+					# remainders[key].append(_t_s_res)
+					r_l = len(remainders[key])
+					for j in range(__max):
+						_t_q_mant.data[__max - j - 1] = remainders[key][j % r_l]
+					break
+				else:
+					remainders[key] = []
 			
 			_t_self_mant.InverseAppend(False)
 			_t_self_mant.Pop(-1)
@@ -1622,7 +1622,7 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
 	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
 	
-	raise CustomException("idk")
+	# raise CustomException("idk")
 	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
