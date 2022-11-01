@@ -1083,7 +1083,7 @@ class hpf:
 			i -= One
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
-	def __truediv__(self, other, set_precision=False, preemptive_offset=None):
+	def __truediv__(self, other, set_precision=False, preemptive_offset=None, quick_size=5001):
 		# print("\nhpf: %s.__truediv__(%s):" % (self, other))
 		bin = Binary()
 		One = Binary([True])
@@ -1126,51 +1126,62 @@ class hpf:
 		
 		#Calculate actual division
 		_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, 1)
+		
+		try:
+			if quick_size != 0:
+				_t_self_mant.LengthPop(_t_self_mant.GetLength()-quick_size)
+				_t_other_mant.LengthPop(_t_other_mant.GetLength()-quick_size)
+		except IndexError:
+			_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant, 1)
+		
 		_max = _t_q_mant.GetLength()-1
 		
 		remainders = dict()
 		
-		for i in range(_max):
-			# print("i: %s" % (i))
-			
-			_t_s_res = _t_self_mant >= _t_other_mant
-			
-			__t_s = Binary(_t_self_mant.data[-25:-1])
-			
-			key = str(__t_s.__repr__())
-			
-			# if _t_s_res:
-				# t_s = "1"
-			# else:
-				# t_s = " "
-			
-			# print("__t_s: %s %s" % (__t_s.__repr__(), t_s))
-			
-			#If subtraction is positive
-			if _t_s_res:
-				_t_q_mant.data[_max-i] = True
-				_t_self_mant = _t_self_mant - _t_other_mant
-			
-			if __t_s.ToInt() != 0:
-				if key in remainders:
-					# print("found")
-					__max = _max - i
-					# remainders[key].append(_t_s_res)
-					r_l = len(remainders[key])
-					for j in range(__max + 1):
-						_t_q_mant.data[__max - j] = remainders[key][j % r_l]
+		if quick_size == 0:
+			for i in range(_max):
+				_t_s_res = _t_self_mant >= _t_other_mant
+				
+				#If subtraction is positive
+				if _t_s_res:
+					_t_q_mant.data[_max-i] = True
+					_t_self_mant = _t_self_mant - _t_other_mant
+				_t_self_mant.InverseAppend(False)
+				_t_self_mant.Pop(-1)
+				
+				if _t_self_mant.ToInt() == 0:
 					break
-				else:
-					remainders[key] = []
-			
-			_t_self_mant.InverseAppend(False)
-			_t_self_mant.Pop(-1)
-			
-			for t_key in remainders:
-				remainders[t_key].append(_t_s_res)
-			
-			if _t_self_mant.ToInt() == 0:
-				break
+		else:
+			for i in range(_max):
+				_t_s_res = _t_self_mant >= _t_other_mant
+				
+				__t_s = Binary(_t_self_mant.data[-15:-1])
+				
+				key = str(__t_s.__repr__())
+				
+				#If subtraction is positive
+				if _t_s_res:
+					_t_q_mant.data[_max-i] = True
+					_t_self_mant = _t_self_mant - _t_other_mant
+				
+				if __t_s.ToInt() != 0:
+					if key in remainders:
+						__max = _max - i
+						r_l = len(remainders[key])
+						for j in range(__max + 1):
+							_t_q_mant.data[__max - j] = remainders[key][j % r_l]
+						break
+					else:
+						remainders[key] = []
+				
+				_t_self_mant.InverseAppend(False)
+				_t_self_mant.Pop(-1)
+				
+				for t_key in remainders:
+					remainders[t_key].append(_t_s_res)
+				
+				if _t_self_mant.ToInt() == 0:
+					break
 		
 		#Find leading one
 		largest_one = -1
@@ -1560,20 +1571,20 @@ def sqrt(n, depth=500, iters=25, show_iters=False, show_in_percentage=False, sho
 	q = _One.DeepCopy()
 	
 	for i in range(iters):
+		start = time()
+		
+		q = q.__add__(n.__truediv__(q, depth, None, 30000), NegOne)
+		
 		if show_iters == True:
 			if show_in_percentage:
 				if len(str(i)) < len(str(iters)):
 					_i_s = "0" * (len(str(iters))-len(str(i))) + str(i)
 				else:
 					_i_s = str(i)
-				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*i/iters)/100))
 				print("q: %s, %s" % (q, q.__repr__()))
+				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*i/iters)/100))
 			else:
 				print("i: %s, %s, %s" % (str(i), q, q.__repr__()))
-		
-		start = time()
-		
-		q = q.__add__(n.__truediv__(q, depth), NegOne)
 		
 		if show_time:
 			nt = time()
@@ -1621,14 +1632,6 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
-	#Scalar
-	print("\nScalar")
-	
-	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
-	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
-	
-	# raise CustomException("idk")
-	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
 	
@@ -1637,30 +1640,38 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	
 	for _i in range(iters):
 		start = time()
+		dividend = factorial(four * i) * ((tstt * i) + eht)
+		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
+		
+		summated = summated.__add__(dividend.__truediv__(divisor, depth, None, 0), False, depth, False)
+		
+		i += One
+	
 		if show_iters:
 			if show_in_percentage:
 				if len(str(_i)) < len(str(iters)):
 					_i_s = "0" * (len(str(iters))-len(str(_i))) + str(_i)
 				else:
 					_i_s = str(m.floor(i.ToFloat()))
-				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*_i/iters)/100))
 				print("q: %s, %s" % (summated, summated.__repr__()))
+				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*_i/iters)/100))
 			else:
-				print("i: %s, %s, %s" % (_i, str(summated), summated.__repr__()))
-		
-		dividend = factorial(four * i) * ((tstt * i) + eht)
-		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
-		
-		summated = summated.__add__(dividend.__truediv__(divisor, depth), False, depth, False)
-		
-		i += One
-		
+				print("i: %s, %s, %s" % (str(summated), summated.__repr__(), _i))
+			
 		if show_time:
 			nt = time()
 			print("dt: %s" % (nt-start))
 	
+	#Scalar
+	print("\nScalar")
+	
+	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
+	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
+	
+	# raise CustomException("idk")
+	
 	start = time()
-	pi = One.__truediv__(scalar * summated, depth)
+	pi = One.__truediv__(scalar * summated, depth, None, 0)
 	
 	if show_time:
 		nt = time()
@@ -1671,4 +1682,4 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	
 	return pi
 
-hpf_pi = pi(1000, 15, True, True, True)
+hpf_pi = pi(33300, 50, True, True, True)
