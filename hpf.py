@@ -1145,7 +1145,7 @@ class hpf:
 				if key in remainders:
 					# print("found")
 					__max = _max - i - 1
-					remainders[key].append(_t_s_res)
+					# remainders[key].append(_t_s_res)
 					r_l = len(remainders[key])
 					for j in range(__max):
 						_t_q_mant.data[__max - j] = remainders[key][j % r_l]
@@ -1622,7 +1622,7 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
 	scalar = trt.__truediv__(x_to_the_y(nn, two), depth)
 	
-	# raise CustomException("idk")
+	raise CustomException("idk")
 	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
@@ -1666,4 +1666,4 @@ def pi(depth=10000, iters=10, show_iters=True, show_in_percentage=True, show_tim
 	
 	return pi
 
-hpf_pi = pi(1000, 25, True, True, True)
+hpf_pi = pi(1000, 15, True, True, True)
