@@ -1521,7 +1521,7 @@ def pi(depth=10000, iters=10, show_iters=True):
 	trt = two * sqrt(two, depth, iters, show_iters)
 	scalar = trt/x_to_the_y(nn, two)
 	
-	raise CustomException("idk")
+	# raise CustomException("idk")
 	
 	i = _Zero.DeepCopy()
 	summated = _Zero.DeepCopy()
@@ -1538,6 +1538,8 @@ def pi(depth=10000, iters=10, show_iters=True):
 		i += One
 	
 	pi = One.__truediv__(scalar * summated, depth)
+	
+	print("q: %s, %s" % (pi, pi.__repr__()))
 	
 	return pi
 
