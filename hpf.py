@@ -62,7 +62,7 @@ import os
 import math as m 
 
 #Set terminal colour to green (To look like it's from the Matrix)
-os.system('color 2')
+# os.system('color 2')
 
 class CustomException(Exception):
 	pass
@@ -339,12 +339,11 @@ class Binary:
 		
 		if _other_len > _self_len:
 			_new_self_bin.InverseLengthAppend(_other_len - _self_len)
-			_new_self_bin.LengthAppend(offset)
-			_new_other_bin.LengthAppend(offset)
 		else:
 			_new_other_bin.InverseLengthAppend(_self_len - _other_len)
-			_new_self_bin.LengthAppend(offset)
-			_new_other_bin.LengthAppend(offset)
+			
+		_new_self_bin.InverseLengthAppend(offset)
+		_new_other_bin.LengthAppend(offset)
 		
 		return _new_self_bin, _new_other_bin
 	
@@ -1032,6 +1031,7 @@ class hpf:
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
 	def __truediv__(self, other, set_precision=False, preemptive_offset=None):
+		# print("\nhpf: %s.__truediv__(%s):" % (self, other))
 		bin = Binary()
 		One = Binary([True])
 		Zero = Binary([False])
@@ -1065,7 +1065,7 @@ class hpf:
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
 		
 		#Allign mantissas
-		_t_self_mant, _t_other_mant = _new_self.mant.DivAllign(_new_other.mant)
+		_new_self.mant, _new_other.mant = _new_self.mant.Allign(_new_other.mant)
 		
 		#Set _t_q_mant_len based on set_precision
 		if type(set_precision) != type(False):
@@ -1077,16 +1077,22 @@ class hpf:
 		#Calculate actual division
 		offs = 0
 		_max = _t_q_mant.GetLength()-1
+		# print("\nfor: %s" % (_max))
 		for i in range(_max):
-			_t_s_res = _t_self_mant >= _t_other_mant
+			
+			_t_self_mant, _t_other_mant = _new_self.mant.Allign(_new_other.mant, True, offs)
 			
 			#If subtraction is positive
-			if _t_s_res:
+			if _t_self_mant >= _t_other_mant:
+				# print("positive")
+				offs = 0
 				_t_q_mant.data[_max-i] = True
-				_t_self_mant = _t_self_mant - _t_other_mant
+				_new_self.mant = _t_self_mant - _t_other_mant
 			
-			_t_self_mant.InverseAppend(False)
-			_t_self_mant.Pop(-1)
+			# _t_self_mant.InverseAppend(False)
+			# _t_self_mant.Pop(-1)
+			
+			offs += 1
 			
 			if _t_self_mant.ToInt() == 0:
 				break
@@ -1130,7 +1136,7 @@ class hpf:
 			_t_q_exp.Append(_t_q_exp_v < Zero)
 			i -= One
 		
-		q = hpf(_t_q_mant, _t_q_exp, _new_self.sign, self.is_zero)
+		q = hpf(_t_q_mant, _t_q_exp, self.sign, self.is_zero)
 		
 		# print("q: %s, %s" % (q, q.__repr__()))
 		
@@ -1497,6 +1503,8 @@ def pi(depth=10000, iters=10, show_iters=True):
 	eht				= hpf()
 	tstt			= hpf()
 	
+	a				= hpf()
+	
 	#Define four
 	four.mant		= Binary([False])
 	four.exp		= Binary([0,0])
@@ -1527,27 +1535,32 @@ def pi(depth=10000, iters=10, show_iters=True):
 	tstt.sign		= Binary([True])
 	tstt.is_zero	= Binary([False])
 	
-	trt = two * sqrt(two, depth, iters, show_iters)
-	scalar = trt/x_to_the_y(nn, two)
+	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters), Binary([True]))
 	
-	raise CustomException("idk")
+	print()
+	print(trt)
+	print(trt.__repr__())
 	
-	i = _Zero.DeepCopy()
-	summated = _Zero.DeepCopy()
+	# scalar = trt/x_to_the_y(nn, two)
 	
-	for _i in range(iters):
-		print("i: %s" % (i))
-		print(summated.__repr__())
+	# # raise CustomException("idk")
+	
+	# i = _Zero.DeepCopy()
+	# summated = _Zero.DeepCopy()
+	
+	# for _i in range(iters):
+		# print("i: %s" % (i))
+		# print(summated.__repr__())
 		
-		dividend = factorial(four * i) * ((tstt * i) + eht)
-		divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
+		# dividend = factorial(four * i) * ((tstt * i) + eht)
+		# divisor  = x_to_the_y(factorial(i), four) * (x_to_the_y(thns, four*i))
 		
-		summated += dividend.__truediv__(divisor, depth)
+		# summated = summated.__add__(dividend.__truediv__(divisor, 2*depth), 2*depth)
 		
-		i += One
+		# i += One
 	
-	pi = One.__truediv__(scalar * summated, depth)
+	# pi = One.__truediv__(scalar.__mul__(summated, depth), depth)
 	
-	return pi
+	# return pi
 
-hpf_pi = pi(2500, 25, True)
+hpf_pi = pi(100, 20, True)
