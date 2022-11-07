@@ -603,7 +603,7 @@ class Binary:
 	def __repr__(self):
 		_str = ("-" * (self.sign == False)) + "0b"
 		for bit in self.data:
-			_str += "1" if bit else "0"
+			_str += "■" if bit else " "
 		return _str
 	
 	def __str__(self):
@@ -1204,7 +1204,7 @@ class hpf:
 			for i in range(_max):
 				_t_s_res = _t_self_mant >= _t_other_mant
 				
-				__t_s = Binary(_t_self_mant.data[-10:-1])
+				__t_s = Binary(_t_self_mant.data[-30:-1])
 				
 				key = str(__t_s.__repr__())
 				
@@ -1313,13 +1313,16 @@ class hpf:
 		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
 		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
 		
+		t_true = _new_self.sign.data[0]
+		t_fals = not t_true	
+		
 		#Check by is_zero
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0] == True:
 			return False
 		if _new_self.is_zero.data[0] != True and _new_other.is_zero.data[0] == True:
-			return new_self.sign.data[0] != True
+			return t_fals
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0]!= True:
-			return _new_other.sign.data[0] != True
+			return _new_other.sign.data[0] == True
 		
 		if _new_self.sign.data[0] == True and _new_other.sign.data[0] != True:
 			return False
@@ -1328,13 +1331,10 @@ class hpf:
 		
 		t = _new_self.mant.GetLength()+_new_other.mant.GetLength()+15
 		
-		if t > 101:
-			t = 101
+		if t > 51:
+			t = 51
 		
-		od = _new_self.__truediv__(_new_other, t, None, 101, False)
-		
-		t_true = _new_self.sign.data[0]
-		t_fals = not t_true	
+		od = _new_self.__truediv__(_new_other, t, None, t, False)
 		
 		#Calculate exponent values
 		#Zero out exp values for length and value calculations
@@ -1363,20 +1363,28 @@ class hpf:
 		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
 		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
 		
+		t_true = _new_self.sign.data[0]
+		t_fals = not t_true	
+		
 		#Check by is_zero
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0] == True:
 			return False
 		if _new_self.is_zero.data[0] != True and _new_other.is_zero.data[0] == True:
 			return _new_self.sign.data[0] == True
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0]!= True:
-			return _new_self.sign.data[0] == True
+			return _new_other.sign.data[0] != True
 		
 		if _new_self.sign.data[0] == True and _new_other.sign.data[0] != True:
 			return True
 		if _new_self.sign.data[0] != True and _new_other.sign.data[0] == True:
 			return False
 		
-		od = _new_self.__truediv__(_new_other, 50)
+		t = _new_self.mant.GetLength()+_new_other.mant.GetLength()+15
+		
+		if t > 51:
+			t = 51
+		
+		od = _new_self.__truediv__(_new_other, t, None, 51, False)
 		
 		#Calculate exponent values
 		#Zero out exp values for length and value calculations
@@ -1384,9 +1392,6 @@ class hpf:
 		
 		#Add leading ones back in within the size of the exponents
 		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
-		
-		t_true = _new_self.sign.data[0]
-		t_fals = not t_true	
 		
 		#Calculate actual values of exponents
 		_new_self_exp_v  = _self_exp_l_bin-od.exp	
@@ -1434,6 +1439,8 @@ class hpf:
 		return hpf(self.mant, self.exp, self.sign, self.is_zero)
 	
 	def ToFloat(self):
+		if self.is_zero.data[0]:
+			return 0
 		temp_mant = Binary(self.mant.data)
 		temp_mant.Append(True)
 		try:
@@ -1541,15 +1548,12 @@ _Two = hpf(Binary([False, False, False, False]), Binary([False]), Binary([True])
 fc = dict()
 
 def factorial(n: hpf):
-	# print("\nfactorial():")
 	ni = str(n.ToFloat())
 	One = _One.DeepCopy()
 	i = _One.DeepCopy()
 	q = _One.DeepCopy()
 	
 	global fc
-	
-	top = n + One
 	
 	if ni in fc:
 		return fc[ni][0]
@@ -1561,7 +1565,7 @@ def factorial(n: hpf):
 	if type(largest) != type(None) and float(key) < float(str(n)):
 		q = fc[largest][0]
 		i = fc[largest][1]
-		while i < top:
+		while float(str(i)) <= float(str(n)):
 			q *= i
 			i += One
 		
@@ -1569,7 +1573,7 @@ def factorial(n: hpf):
 		
 		return q
 	
-	while i < top:
+	while float(str(i)) <= float(str(n)):
 		q *= i
 		i += One
 	
@@ -1651,7 +1655,7 @@ def sin(n, iters=15, depth=1000, show_iters=False):
 	
 	return q
 
-def exp(n, iters=15, show_iters=False):
+def exp(n, depth=_GlobalPrecision_, iters=15, show_iters=False):
 	#Boring setup
 	q = _Zero.DeepCopy()
 	i = _Zero.DeepCopy()
@@ -1663,9 +1667,9 @@ def exp(n, iters=15, show_iters=False):
 		
 		_exp_divisor = x_to_the_y(n, i)
 		_fac_dividend = factorial(i)
-		_exp_divided = _exp_divisor.__truediv__(_fac_dividend, _exp_divisor.mant.GetLength()+_fac_dividend.mant.GetLength()+(15*(iters-_i)))
+		_exp_divided = _exp_divisor.__truediv__(_fac_dividend, depth)
 		
-		q += _exp_divided
+		q = q.__add__(_exp_divided, False, depth)
 		i += One
 	
 	return q
@@ -1706,7 +1710,7 @@ def OffsetExponentValue(x, offset):
 	
 	return hpf(x.mant, _t_q_exp, x.sign, x.is_zero)
 
-def sqrt(n, depth=_GlobalPrecision_, iters=15, show_iters=False, show_in_percentage=False, show_time=False):
+def sqrt(n, depth, iters=10, show_iters=False, show_in_percentage=False, show_time=False, quick_size=0):
 	NegOne = Binary([True], False, False)
 	Two = _Two.DeepCopy()
 	q = _One.DeepCopy()
@@ -1718,7 +1722,10 @@ def sqrt(n, depth=_GlobalPrecision_, iters=15, show_iters=False, show_in_percent
 	for i in range(iters):
 		start = time()
 		
-		q = q.__add__(n.__truediv__(q, depth, None, 3301, True, True), NegOne, depth)
+		if i < 10:
+			q = q.__add__(n.__truediv__(q, depth, None, 2501, True, True), NegOne, depth)
+		else:
+			q = q.__add__(n.__truediv__(q, depth, None, quick_size, True, False), NegOne, depth)
 		
 		if show_iters == True:
 			if show_in_percentage:
@@ -1729,7 +1736,7 @@ def sqrt(n, depth=_GlobalPrecision_, iters=15, show_iters=False, show_in_percent
 				print("q: %s, %s" % (q, q.__repr__()))
 				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*i/iters)/100))
 			else:
-				print("i: %s, %s, %s" % (str(i), q, q.__repr__()))
+				print("%s" % (q.__repr__()))
 		
 		if show_time == True:
 			nt = time()
@@ -1747,7 +1754,7 @@ def sqrt(n, depth=_GlobalPrecision_, iters=15, show_iters=False, show_in_percent
 	return q
 
 def estimate_time(origin_time, now_time, iters, _i, ddt):
-	q = (iters-_i)*(now_time - origin_time + ddt)/(_i+1)
+	q = (iters-_i)*(now_time - origin_time + ddt*(iters-_i))/(_i+1)
 	
 	if abs(q) > 60:
 		min = m.floor((q - (q % 60))/60)
@@ -1803,6 +1810,14 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 	
 	nns = x_to_the_y(nn, two)
 	
+	#Scalar
+	print("\nScalar")
+	
+	trt = OffsetExponentValue(sqrt(two, depth, 15, show_iters, show_in_percentage, show_time), Binary([True]))
+	scalar = trt.__truediv__(nns, depth, None, 1001)
+	
+	# raise CustomException("idk")
+	
 	#Main Ramanujan-Sato body
 	print("\nMain Ramanujan-Sato body:")
 	
@@ -1835,7 +1850,7 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 				print("q: %s, %s" % (summated, summated.__repr__()))
 				print("\ni: %s/%s, %s%%" % (_i_s, iters-1, m.floor(10000*_i/iters)/100))
 			else:
-				print("i: %s, %s, %s" % (str(summated), summated.__repr__(), _i))
+				print("%s" % (summated.__repr__()), end="")
 			
 		if show_time:
 			nt = time()
@@ -1847,14 +1862,6 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 			ldt = dt
 	
 		i += One
-	
-	# raise CustomException("idk")
-	
-	#Scalar
-	print("\nScalar")
-	
-	trt = OffsetExponentValue(sqrt(two, depth, iters, show_iters, show_in_percentage, show_time), Binary([True]))
-	scalar = trt.__truediv__(nns, depth, None, 1001)
 	
 	start = time()
 	pi = One.__truediv__((scalar * summated), depth, None, depth, False, True)
@@ -1868,4 +1875,4 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 	
 	return pi
 
-pi(_GlobalPrecision_, 50, True, True, True)
+pi(_GlobalPrecision_, 25, True, False, False)
