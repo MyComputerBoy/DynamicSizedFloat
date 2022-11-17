@@ -55,10 +55,12 @@ import os
 from time import time
 import math as m 
 
-#Set terminal colour to green (To look like it's from the Matrix)
-os.system('color 2')
+os.system("title Python 3.11.0: High Precision Floating point")
 
-_GlobalPrecision_ = 10000
+#Set terminal colour to green (To look like it's from the Matrix)
+# os.system('color 2')
+
+_GlobalPrecision_ = 100
 
 class CustomException(Exception):
 	pass
@@ -1001,7 +1003,7 @@ class hpf:
 		_t_q.sign.data[0] = not _t_q.sign.data[0]
 		return _t_q
 	
-	def __mul__(self, other, set_precision=_GlobalPrecision_):
+	def __mul__(self, other, set_precision=_GlobalPrecision_, propper=True):
 		bin = Binary()
 		Zero = Binary([False])
 		One = Binary([True])
@@ -1011,8 +1013,12 @@ class hpf:
 			return hpf(Binary([False]), Binary([True]), Binary([True]), Binary([True]))
 		
 		#Clone hpf objects to new temporary variables to not mess with original objects
-		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
-		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		if propper:
+			_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
+			_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		else:
+			_new_self = self
+			_new_other = other
 		
 		#Add leading one for computation
 		_new_self.mant.Append(True)
@@ -1204,7 +1210,7 @@ class hpf:
 			for i in range(_max):
 				_t_s_res = _t_self_mant >= _t_other_mant
 				
-				__t_s = Binary(_t_self_mant.data[-30:-1])
+				__t_s = Binary(_t_self_mant.data[-20:-1])
 				
 				key = str(__t_s.__repr__())
 				
@@ -1277,6 +1283,121 @@ class hpf:
 		
 		return q
 	
+	def __mul_add__(self, other, adding, set_precision=_GlobalPrecision_, propper=False):
+		bin = Binary()
+		Zero = Binary([False])
+		One = Binary([True])
+		
+		#Handle zeros
+		if self.is_zero.data[0] or other.is_zero.data[0]:
+			return hpf(Binary([False]), Binary([True]), Binary([True]), Binary([True]))
+		
+		#Clone hpf objects to new temporary variables to not mess with original objects
+		if propper:
+			_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
+			_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		else:
+			_new_self = self
+			_new_other = other
+		
+		#Add leading one for computation
+		_new_self.mant.Append(True)
+		_new_other.mant.Append(True)
+		
+		
+		#Calculate exponent values
+		#Zero out exp values for length and value calculations
+		_self_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
+		_other_exp_l_bin = _new_other.exp.__xor__(_new_other.exp)
+		adding_exp_l_bin = adding.exp.xor(adding.exp)
+		
+		#Add leading ones back in within the size of the exponents
+		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
+		_other_exp_l_bin.data[_other_exp_l_bin.GetLength()-1] = True
+		adding_exp_l_bin.data[adding_exp_l_bin.GetLength()-1] = True
+		
+		#Calculate actual values of exponents
+		_new_self_exp_v  = _self_exp_l_bin-_new_self.exp
+		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
+		_t_q_exp_v = _new_self_exp_v + _new_other_exp_v
+		_a_exp_v = adding_exp_l_bin-adding.exp
+		
+		#Make _t_q object for computation
+		if type(set_precision) != type(False):
+			_t_q_mant_len = set_precision + _t_q_exp_v.ToInt()
+			_t_q = Binary([False for i in range(_t_q_mant_len)])		
+			
+			#Calculate multiplication of mantissa
+			_t_q, _t_other = _t_q.Allign(_new_other.mant, True)
+
+			if _t_q.GetLength() > _t_q_mant_len:
+				diff = _t_q.GetLength() - _t_q_mant_len
+				_t_q.LengthPop(diff)
+				_t_other.LengthPop(diff)
+		else:
+			_t_q_mant_len = _new_self.mant.GetLength()+_new_other.mant.GetLength()
+			_t_q = Binary([False for i in range(_t_q_mant_len)])
+			
+			_t_q, _t_other = _t_q.Allign(_new_other.mant, True)
+		
+		#Calculate multiplication of mantissa
+		for i in range(_new_self.mant.GetLength()-1, -1, -1):
+			if _new_self.mant.data[i]:
+				_t_q = _t_q.__pure_add__(_t_other, False, True, False)
+				if _t_q.co:
+					_t_q_exp_v += One
+					_t_other.Append(False)
+			_t_other.Pop()
+			_t_other.Append(False)
+		
+		_a_exp = _a_exp_v.ToInt()
+		_t_q_exp = _t_q_exp_v.ToInt()
+		# if _a_exp > _t_q_exp:
+			# [t_q, adding_mant] = Binary.Allign(_t_q, adding.mant, True, 
+		
+		#Calculate _t_q sign
+		_t_q_sig = Binary([not (_new_self.sign.data[0] + _new_other.sign.data[0]) == 1])
+		
+		
+		#Find leading one
+		largest_one = -1
+		_max = _t_q.GetLength()-1
+		for i in range(_max):
+			if _t_q.data[_max-i]:
+				largest_one = i
+				break
+		
+		#Pop leading one for floating point compliance
+		if largest_one == -1:
+			_t_q = Binary([False for i in range(_t_q.GetLength())])
+		else:
+			#Shift is how many bits was popped at the top
+			_t_q.LengthPop(largest_one+1, -1)
+			
+			_bin_largest_one = ReturnableDoubleToBin(largest_one)
+		
+		#Calculate _t_q_exp
+		_t_q_exp_v_l = Binary()
+		while TwosPow(_t_q_exp_v_l) <= _t_q_exp_v.Abs():
+			_t_q_exp_v_l += One
+		_t_q_exp_v_l += One
+		
+		#Remove leading zeros for propper calculation
+		_t_q_exp = TwosPow(_t_q_exp_v_l)-_t_q_exp_v
+		while _t_q_exp.data[_t_q_exp.GetLength()-1] != True:
+			_t_q_exp.Pop(_t_q_exp.GetLength()-1)
+		
+		#Calculate _t_q_exp_l
+		_t_q_exp_l = Binary()
+		_t_q_exp_l.DoubleToBin(_t_q_exp.GetLength()-1)
+		
+		#Add leading zero for propper exponent value
+		i = _t_q_exp_v_l-_t_q_exp_l
+		while i > Zero:
+			_t_q_exp.Append(_t_q_exp_v < Zero)
+			i -= One
+		
+		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
 	def __eq__(self, other):
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
@@ -1293,18 +1414,14 @@ class hpf:
 			return False
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0]!= True:
 			return False
-			
-		od = _new_self / _new_other
-		ad = _new_other / _new_self
 		
-		if od.sign != ad.sign:
-			return False
-		if od.exp != ad.exp:
-			return False
-		if od.mant != ad.mant:
-			return False
+		od = _new_self - _new_other
 		
-		return True
+		#Check is_zero
+		if od.is_zero.data[0]:
+			return True
+		
+		return False
 	def __lt__(self, other):
 		# print("\nhpf.__lt__():")
 		Zero = Binary([False], False, True)
@@ -1329,31 +1446,18 @@ class hpf:
 		if _new_self.sign.data[0] != True and _new_other.sign.data[0] == True:
 			return True
 		
-		t = _new_self.mant.GetLength()+_new_other.mant.GetLength()+15
+		#Subtract to compare
+		od = _new_self - _new_other
 		
-		if t > 51:
-			t = 51
+		#Check is_zero
+		if od.is_zero.data[0]:
+			return False
 		
-		od = _new_self.__truediv__(_new_other, t, None, t, False)
+		#Check sign
+		if od.sign.data[0]:
+			return False
 		
-		#Calculate exponent values
-		#Zero out exp values for length and value calculations
-		_self_exp_l_bin = od.exp.__xor__(od.exp)
-		
-		# Add leading ones back in within the size of the exponents
-		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
-		
-		#Calculate actual values of exponents
-		_new_self_exp_v  = _self_exp_l_bin-od.exp	
-		if od.exp.data[od.exp.GetLength()-1]:
-			for i in range(od.mant.GetLength()-2):
-				if od.mant.data[i]:
-					return t_true
-			return t_fals
-		
-		# print("end")
-		
-		return t_fals
+		return True
 	def __le__(self, other):
 		if self.__eq__(other) or self.__lt__(other):
 			return True
@@ -1379,29 +1483,18 @@ class hpf:
 		if _new_self.sign.data[0] != True and _new_other.sign.data[0] == True:
 			return False
 		
-		t = _new_self.mant.GetLength()+_new_other.mant.GetLength()+15
+		#Subtract to compare
+		od = _new_self - _new_other
 		
-		if t > 51:
-			t = 51
+		#Check is_zero
+		if od.is_zero.data[0]:
+			return False
 		
-		od = _new_self.__truediv__(_new_other, t, None, 51, False)
+		#Check sign
+		if od.sign.data[0]:
+			return True
 		
-		#Calculate exponent values
-		#Zero out exp values for length and value calculations
-		_self_exp_l_bin = od.exp.__xor__(od.exp)
-		
-		#Add leading ones back in within the size of the exponents
-		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
-		
-		#Calculate actual values of exponents
-		_new_self_exp_v  = _self_exp_l_bin-od.exp	
-		if od.exp.data[od.exp.GetLength()-1]:
-			for i in range(od.mant.GetLength()-2):
-				if od.mant.data[i]:
-					return t_fals
-			return t_true
-		
-		return t_true
+		return False
 	def __ge__(self, other):
 		if self.__eq__(other) or self.__gt__(other):
 			return True
@@ -1723,9 +1816,9 @@ def sqrt(n, depth, iters=10, show_iters=False, show_in_percentage=False, show_ti
 		start = time()
 		
 		if i < 10:
-			q = q.__add__(n.__truediv__(q, depth, None, 2501, True, True), NegOne, depth)
+			q = q.__add__(n.__truediv__(q, depth, None, 2501, True, False), NegOne, depth)
 		else:
-			q = q.__add__(n.__truediv__(q, depth, None, quick_size, True, False), NegOne, depth)
+			q = q.__add__(n.__truediv__(q, depth, None, 15000, True, False), NegOne, depth)
 		
 		if show_iters == True:
 			if show_in_percentage:
@@ -1810,14 +1903,6 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 	
 	nns = x_to_the_y(nn, two)
 	
-	#Scalar
-	print("\nScalar")
-	
-	trt = OffsetExponentValue(sqrt(two, depth, 15, show_iters, show_in_percentage, show_time), Binary([True]))
-	scalar = trt.__truediv__(nns, depth, None, 1001)
-	
-	# raise CustomException("idk")
-	
 	#Main Ramanujan-Sato body
 	print("\nMain Ramanujan-Sato body:")
 	
@@ -1863,6 +1948,14 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 	
 		i += One
 	
+	#Scalar
+	print("\nScalar")
+	
+	trt = OffsetExponentValue(sqrt(two, depth, 15, show_iters, show_in_percentage, show_time), Binary([True]))
+	scalar = trt.__truediv__(nns, depth, None, 1001)
+	
+	# raise CustomException("idk")
+	
 	start = time()
 	pi = One.__truediv__((scalar * summated), depth, None, depth, False, True)
 	
@@ -1875,4 +1968,4 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 	
 	return pi
 
-pi(_GlobalPrecision_, 25, True, False, False)
+# pi(_GlobalPrecision_, 25, True, True, True)
