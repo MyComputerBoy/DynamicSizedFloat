@@ -55,14 +55,19 @@ import os
 from time import time
 import math as m 
 
-os.system("title Python 3.11.0: High Precision Floating point")
+#If it's convenient to name the terminal windows uncomment
+# os.system("title Python 3.11.0: High Precision Floating point")
 
 #Set terminal colour to green (To look like it's from the Matrix)
 # os.system('color 2')
 
-_GlobalPrecision_ = 100
+#Bit are log 10 base 2 more inefficient than decimal, thus about 3.3219 times less efficient
+_GlobalPrecision_ = 83049
 
-class CustomException(Exception):
+class HPFException(Exception):
+	pass
+
+class BreakException(Exception):
 	pass
 
 @dataclass
@@ -220,19 +225,21 @@ class Binary:
 		for i, e in enumerate(_new_self_bin.data):
 			t = _new_self_bin.data[i] + (not _new_other_bin.data[i]) + ci
 			q[i] = t % 2
-			ci = (t - (t % 2))/2
+			ci = (t - q[i])/2
 		
 		if using_twos_compliment:
 			if ci == True:
 				return Binary(q, ci, ci)
 			for i, e in enumerate(q):
 				q[i] = not e
-			
-			_t_q_b = Binary(q)
-			_t_q_b += Binary([True])
-			q = _t_q_b.data
-			sign = False
-			return Binary(q, ci, sign)
+			co = True
+			for i, e in enumerate(q):
+				if e:
+					q[i] = False
+				else:
+					q[i] = True
+					break
+			return Binary(q, ci, False)
 		
 		return Binary(q, ci, ci)
 	
@@ -403,9 +410,22 @@ class Binary:
 			q += 2**i*e 
 		return q
 	
+	def IsZero(self):
+		for i in self.data:
+			if i:
+				return False 
+		return True
+	
+	def FloatExponentValueToRepr(self):
+		t = [False for i in range(len(self.data)-1)]
+		t.append(True)
+		tb = Binary(t)
+		ql = tb - self
+		return ql
+	
 	def LimitedToInt(self, depth=75):
 		q = 0
-		for i in range(depth):
+		for i in range(depth): 
 			q += 2**i*self.data[self.GetLength()-depth+i]
 		return q
 	
@@ -605,7 +625,7 @@ class Binary:
 	def __repr__(self):
 		_str = ("-" * (self.sign == False)) + "0b"
 		for bit in self.data:
-			_str += "■" if bit else " "
+			_str += "1" if bit else "0"
 		return _str
 	
 	def __str__(self):
@@ -680,7 +700,7 @@ class hpf:
 		else:
 			_NoneType = type(None)
 			if type(exp) == _NoneType or type(sign) == _NoneType or type(is_zero) == _NoneType:
-				raise CustomException("Error: Initialization of hpf class requires mantissa, exp, sign and is_zero to be declared")
+				raise CustomException("init")
 			self.mant	 = Binary(mantissa.data)
 			self.exp	 = Binary(exp.data)
 			self.sign	 = Binary(sign.data)
@@ -770,17 +790,8 @@ class hpf:
 			_new_other = other
 		
 		#Calculate exponent values
-		#Zero out exp values for length and value calculations
-		_self_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
-		_other_exp_l_bin = _new_other.exp.__xor__(_new_other.exp)
-		
-		#Add leading ones back in within the size of the exponents
-		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
-		_other_exp_l_bin.data[_other_exp_l_bin.GetLength()-1] = True
-		
-		#Calculate actual values of exponents
-		_new_self_exp_v  = _self_exp_l_bin-_new_self.exp
-		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
+		_new_self_exp_v  = _new_self.exp.FloatExponentValueToRepr()
+		_new_other_exp_v = _new_other.exp.FloatExponentValueToRepr()
 		
 		#Check which has the largest value
 		if _new_self_exp_v > _new_other_exp_v:
@@ -892,14 +903,8 @@ class hpf:
 			_new_other = other
 		
 		#Calculate exponent values
-		_new_self_exp	= _new_self.exp.__xor__(  _new_self.exp)
-		_new_other_exp	= _new_other.exp.__xor__(_new_other.exp)
-		
-		_new_self_exp.data[  _new_self_exp.GetLength()-1] = True
-		_new_other_exp.data[_new_other_exp.GetLength()-1] = True
-		
-		_self_exp_val	= _new_self_exp- _new_self.exp
-		_other_exp_val	= _new_other_exp-_new_other.exp
+		_self_exp_val	= _new_self.exp.FloatExponentValueToRepr()
+		_other_exp_val	= _new_other.exp.FloatExponentValueToRepr()
 		
 		if _self_exp_val > _other_exp_val:
 			_t_q_exp_v = _self_exp_val
@@ -1026,21 +1031,9 @@ class hpf:
 		
 		
 		#Calculate exponent values
-		#Zero out exp values for length and value calculations
-		_self_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
-		_other_exp_l_bin = _new_other.exp.__xor__(_new_other.exp)
-		
-		#Add leading ones back in within the size of the exponents
-		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
-		_other_exp_l_bin.data[_other_exp_l_bin.GetLength()-1] = True
-		
-		#Calculate actual values of exponents
-		_new_self_exp_v  = _self_exp_l_bin-_new_self.exp
-		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
+		_new_self_exp_v = _new_self.exp.FloatExponentValueToRepr()
+		_new_other_exp_v = _new_other.exp.FloatExponentValueToRepr()
 		_t_q_exp_v = _new_self_exp_v + _new_other_exp_v
-		
-		# if _t_q_exp_v.co:
-			# _t_q_exp_v.Append(True)
 		
 		#Make _t_q object for computation
 		if type(set_precision) != type(False):
@@ -1134,17 +1127,8 @@ class hpf:
 		_new_other.mant.Append(True)
 		
 		#Calculate exponent values
-		#Zero out exp values for length and value calculations
-		_self_exp_l_bin = _new_self.exp.__xor__(_new_self.exp)
-		_other_exp_l_bin = _new_other.exp.__xor__(_new_other.exp)
-		
-		#Add leading ones back in within the size of the exponents
-		_self_exp_l_bin.data[_self_exp_l_bin.GetLength()-1] = True
-		_other_exp_l_bin.data[_other_exp_l_bin.GetLength()-1] = True
-		
-		#Calculate actual values of exponents
-		_new_self_exp_v  = _self_exp_l_bin-_new_self.exp
-		_new_other_exp_v = _other_exp_l_bin-_new_other.exp
+		_new_self_exp_v = _new_self.exp.FloatExponentValueToRepr()
+		_new_other_exp_v = _new_other.exp.FloatExponentValueToRepr()
 		_t_q_exp_v = _new_self_exp_v - _new_other_exp_v
 		
 		#Set _t_q_mant_len based on set_precision
@@ -1185,7 +1169,7 @@ class hpf:
 						_t_q_mant.data[_max-i] = True
 						_t_self_mant = _t_self_mant.__pure_sub__(_t_other_mant, True, False, False)
 					
-						if _t_self_mant.ToInt() == 0:
+						if _t_self_mant.IsZero():
 							break
 					
 					_t_self_mant.InverseAppend(False)
@@ -1200,7 +1184,7 @@ class hpf:
 						_t_q_mant.data[_max-i] = True
 						_t_self_mant = _t_self_mant.__pure_sub__(_t_other_mant, True, False, False)
 					
-						if _t_self_mant.ToInt() == 0:
+						if _t_self_mant.IsZero():
 							break
 					
 					_t_self_mant.InverseAppend(False)
@@ -1219,10 +1203,10 @@ class hpf:
 					_t_q_mant.data[_max-i] = True
 					_t_self_mant = _t_self_mant - _t_other_mant
 					
-					if _t_self_mant.ToInt() == 0:
+					if _t_self_mant.IsZero():
 						break
 				
-				if __t_s.ToInt() != 0:
+				if not __t_s.IsZero():
 					if key in remainders:
 						__max = _max - i
 						r_l = len(remainders[key])
@@ -1398,14 +1382,12 @@ class hpf:
 			i -= One
 		
 		return hpf(_t_q, _t_q_exp, _t_q_sig, self.is_zero)
-	def __eq__(self, other):
+	def __eq__(self, other, DoAllign=False):
 		#Clone hpf objects to new temporary variables to not mess with original objects
-		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
-		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
-		
-		#Add leading one for computation
-		_new_self.mant.Append(True)
-		_new_other.mant.Append(True)
+		_new_self = self
+		_new_other = other
+		# _new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
+		# _new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
 		
 		#Check by is_zero
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0] == True:
@@ -1415,13 +1397,14 @@ class hpf:
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0]!= True:
 			return False
 		
-		od = _new_self - _new_other
+		if DoAllign:
+			_new_self_mant, _new_other_mant = _new_self.mant.Allign(_new_other.mant, True, False)
 		
-		#Check is_zero
-		if od.is_zero.data[0]:
-			return True
+		for i, e in enumerate(_new_self_mant):
+			if _new_self_mant[i] != _new_other_mant[i]:
+				return False
 		
-		return False
+		return True
 	def __lt__(self, other):
 		# print("\nhpf.__lt__():")
 		Zero = Binary([False], False, True)
@@ -1429,6 +1412,10 @@ class hpf:
 		#Clone hpf objects to new temporary variables to not mess with original objects
 		_new_self = hpf(self.mant, self.exp, self.sign, self.is_zero)
 		_new_other = hpf(other.mant, other.exp, other.sign, other.is_zero)
+		
+		#Add leading one for computation
+		_new_self.mant.Append(True)
+		_new_other.mant.Append(True)
 		
 		t_true = _new_self.sign.data[0]
 		t_fals = not t_true	
@@ -1511,20 +1498,12 @@ class hpf:
 			return True
 		if _new_self.is_zero.data[0] == True and _new_other.is_zero.data[0]!= True:
 			return True
-			
-		od = _new_self.__truediv__(_new_other, 50)
-		ad = _new_other.__truediv__(_new_self, 50)
 		
-		#Add leading one for computation
-		_new_self.mant.Append(True)
-		_new_other.mant.Append(True)
+		_new_self_mant, _new_other_mant = _new_self.Allign(_new_other, False, False)
 		
-		if od.sign != ad.sign:
-			return True
-		if od.exp != ad.exp:
-			return True
-		if od.mant != ad.mant:
-			return True
+		for i, e in enumerate(_new_self_mant):
+			if _new_self_mant[i] != _new_other_mant:
+				return True
 		
 		return False
 	
@@ -1815,10 +1794,10 @@ def sqrt(n, depth, iters=10, show_iters=False, show_in_percentage=False, show_ti
 	for i in range(iters):
 		start = time()
 		
-		if i < 10:
-			q = q.__add__(n.__truediv__(q, depth, None, 2501, True, False), NegOne, depth)
+		if i < m.floor(iters/2):
+			q = q.__add__(n.__truediv__(q, depth, None, m.floor(depth/4), True, True), NegOne, depth)
 		else:
-			q = q.__add__(n.__truediv__(q, depth, None, 15000, True, False), NegOne, depth)
+			q = q.__add__(n.__truediv__(q, depth, None, m.floor(depth/2), True, False), NegOne, depth)
 		
 		if show_iters == True:
 			if show_in_percentage:
@@ -1837,24 +1816,13 @@ def sqrt(n, depth, iters=10, show_iters=False, show_in_percentage=False, show_ti
 			if i == 0:
 				first_dt = dt
 			print("dt: %s" % (dt))
-			print("eta: %s" % (estimate_time(origin_time, nt, iters, i, dt-ldt)))
+			print("eta: %s" % (estimate_time(origin_time, nt, iters, i, dt)))
 			ldt = dt
-		
-		# if q.is_zero:
-			# print("broke")
-			# break
 		
 	return q
 
-def estimate_time(origin_time, now_time, iters, _i, ddt):
-	q = (iters-_i)*(now_time - origin_time + ddt*(iters-_i))/(_i+1)
-	
-	if abs(q) > 60:
-		min = m.floor((q - (q % 60))/60)
-		s = m.floor(100*(q % 60))/100
-		q =  m.floor(100*(q % 60))/100
-		
-		return q
+def estimate_time(origin_time, now_time, iters, _i, dt):
+	q = (iters-_i)*dt
 	
 	return m.floor(100*q)/100
 
@@ -1923,8 +1891,8 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 		divisorb = (x_to_the_y(thns, four*i))
 		
 		divisor  = divisora * divisorb
-		
-		summated  = summated.__add__(dividend.__truediv__(divisor, depth, None, depth, True), False, depth)
+			
+		summated  = summated.__add__(dividend.__truediv__(divisor, depth, None, m.floor(2*depth/3), True), False, depth)
 		
 		if show_iters:
 			if show_in_percentage:
@@ -1940,10 +1908,9 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 		if show_time:
 			nt = time()
 			dt = nt-start
-			if _i == 0:
-				first_dt = dt
+			start = nt
 			print("dt:  %s" % (dt))
-			print("eta: %s" % (estimate_time(origin_time, nt, iters, _i, dt-ldt)))
+			print("eta: %s" % (estimate_time(origin_time, nt, iters, _i, dt)))
 			ldt = dt
 	
 		i += One
@@ -1954,10 +1921,10 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 	trt = OffsetExponentValue(sqrt(two, depth, 15, show_iters, show_in_percentage, show_time), Binary([True]))
 	scalar = trt.__truediv__(nns, depth, None, 1001)
 	
-	# raise CustomException("idk")
+	# raise BreakException("Break Point.")
 	
 	start = time()
-	pi = One.__truediv__((scalar * summated), depth, None, depth, False, True)
+	pi = One.__truediv__((scalar * summated), depth, None, m.floor(2*depth/3), False, True)
 	
 	if show_time:
 		nt = time()
@@ -1966,6 +1933,16 @@ def pi(depth=_GlobalPrecision_, iters=15, show_iters=True, show_in_percentage=Tr
 	print(pi)
 	print(pi.__repr__())
 	
-	return pi
+	return pi, trt
 
-# pi(_GlobalPrecision_, 25, True, True, True)
+def AutomatedPi(path="C:/Users/hatel/Documents/python3.10/hpfpiq.txt")
+	hpfpi, hpftrt = pi(_GlobalPrecision_, 25, True, True, True)
+	print(hpfpi)
+	fh = open(path, "w+")
+	fh.write("hpfpi = [\n")
+	print("	bit_depth = " + str(_GlobalPrecision_) + ",\n")
+	fh.write("	" + hpfpi.__repr__() + "]\n")
+	fh.write("hpftwosqrttwo = \n")
+	fh.write("	" + str(_GlobalPrecision_) + ",\n")
+	fh.write("	" + hpftrt.__repr__() + "]\n")
+	fh.close()
